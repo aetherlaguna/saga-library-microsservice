@@ -82,6 +82,24 @@ public class Loan {
         return Set.copyOf(bookIds);
     }
 
+    public void activate() {
+        if (status != LoanStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Somente empréstimos pendentes podem ser ativados");
+        }
+
+        status = LoanStatus.ACTIVE;
+    }
+
+    public void cancel() {
+        if (status != LoanStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Somente empréstimos pendentes podem ser cancelados");
+        }
+
+        status = LoanStatus.CANCELLED;
+    }
+
     public static Loan create(
             UUID memberId,
             UUID registeredBy,
