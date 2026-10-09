@@ -1,0 +1,17 @@
+services:
+  loans-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: loans
+      POSTGRES_USER: loans
+      POSTGRES_PASSWORD: secure_pass
+    volumes:
+      - loans-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loans -d loans"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  loans-db-data:
