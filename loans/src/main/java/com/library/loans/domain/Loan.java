@@ -20,6 +20,12 @@ public class Loan {
     @Column(nullable = false, length = 30)
     private LoanStatus status;
 
+    @Column(name = "member_id", nullable = false)
+    private UUID memberId;
+
+    @Column(name = "registered_by", nullable = false)
+    private UUID registeredBy;
+
     protected Loan() {
     }
 
@@ -31,4 +37,11 @@ public class Loan {
         return status;
     }
 
+    public UUID getMemberId() {
+        return memberId;
+    }
+
+    public UUID getRegisteredBy() {
+        return registeredBy;
+    }
 }
