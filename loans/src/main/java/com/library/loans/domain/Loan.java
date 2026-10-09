@@ -82,4 +82,43 @@ public class Loan {
         return Set.copyOf(bookIds);
     }
 
+    public static Loan create(
+            UUID memberId,
+            UUID registeredBy,
+            Set<UUID> bookIds,
+            Instant createdAt,
+            Instant dueAt) {
+
+        Objects.requireNonNull(memberId, "Membro é obrigatório");
+        Objects.requireNonNull(registeredBy, "Operador é obrigatório");
+        Objects.requireNonNull(bookIds, "Livros são obrigatórios");
+        Objects.requireNonNull(createdAt, "Data de criação é obrigatória");
+        Objects.requireNonNull(dueAt, "Prazo de devolução é obrigatório");
+
+        if (bookIds.isEmpty()) {
+            throw new InvalidLoanException(
+                    "O empréstimo deve conter pelo menos um livro");
+        }
+
+        if (bookIds.stream().anyMatch(Objects::isNull)) {
+            throw new InvalidLoanException(
+                    "Os identificadores dos livros não podem ser nulos");
+        }
+
+        if (!dueAt.isAfter(createdAt)) {
+            throw new InvalidLoanException(
+                    "O prazo de devolução deve ser posterior à criação");
+        }
+
+        Loan loan = new Loan();
+        loan.id = UUID.randomUUID();
+        loan.memberId = memberId;
+        loan.registeredBy = registeredBy;
+        loan.bookIds = new HashSet<>(bookIds);
+        loan.status = LoanStatus.PENDING;
+        loan.createdAt = createdAt;
+        loan.dueAt = dueAt;
+
+        return loan;
+    }
 }
