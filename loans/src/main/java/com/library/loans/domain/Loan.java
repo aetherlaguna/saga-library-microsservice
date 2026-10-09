@@ -83,6 +83,10 @@ public class Loan {
     }
 
     public void activate() {
+        if (status == LoanStatus.ACTIVE) {
+            return;
+        }
+
         if (status != LoanStatus.PENDING) {
             throw new IllegalStateException(
                     "Somente empréstimos pendentes podem ser ativados");
@@ -92,6 +96,10 @@ public class Loan {
     }
 
     public void cancel() {
+        if (status == LoanStatus.CANCELLED) {
+            return;
+        }
+
         if (status != LoanStatus.PENDING) {
             throw new IllegalStateException(
                     "Somente empréstimos pendentes podem ser cancelados");
