@@ -12,6 +12,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  loans:
+    build:
+      context: ./loans
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://loans-db:5432/loans
+      SPRING_DATASOURCE_USERNAME: loans
+      SPRING_DATASOURCE_PASSWORD: secure_pass
+    depends_on:
+      loans-db:
+        condition: service_healthy
 
 volumes:
   loans-db-data:
