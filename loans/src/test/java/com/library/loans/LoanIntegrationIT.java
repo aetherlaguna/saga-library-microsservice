@@ -11,9 +11,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +38,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.jayway.jsonpath.JsonPath;
 import com.library.loans.domain.Loan;
 import com.library.loans.repository.LoanRepository;
+import com.library.loans.service.LoanService;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -124,6 +130,49 @@ class LoanIntegrationIT {
                 .isZero();
     }
 
+    static Stream<Arguments> unreadableRequests() {
+        String member = UUID.randomUUID().toString();
+        String operator = UUID.randomUUID().toString();
+        String book = UUID.randomUUID().toString();
+        String due = Instant.now().plusSeconds(86400).toString();
+        String body = """
+                {"memberId":"%s","registeredBy":"%s","bookIds":["%s"],"dueAt":"%s"}
+                """.formatted(member, operator, book, due);
+        return Stream.of(
+                Arguments.of("JSON truncado", "{\"memberId\":"),
+                Arguments.of("Corpo vazio", ""),
+                Arguments.of("Corpo null", "null"),
+                Arguments.of("Array no lugar do objeto", "[]"),
+                Arguments.of("memberId inválido", body.replace(member, "invalid-marker")),
+                Arguments.of("registeredBy inválido", body.replace(operator, "invalid-marker")),
+                Arguments.of("UUID de livro inválido", body.replace(book, "invalid-marker")),
+                Arguments.of("bookIds fora do formato array", body.replace(
+                        "[\"" + book + "\"]", "\"invalid-marker\"")),
+                Arguments.of("Data inválida", body.replace(due, "invalid-marker")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("unreadableRequests")
+    void rejectsUnreadableRequestsWithoutExposingInputOrPersistingData(String name, String body)
+            throws Exception {
+        Long loanCount = jdbc.queryForObject("select count(*) from loans", Long.class);
+        Long bookCount = jdbc.queryForObject("select count(*) from loan_books", Long.class);
+        var response = request("/loans", body);
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(response.headers().firstValue("content-type").orElseThrow())
+                .startsWith("application/problem+json");
+        var problem = JsonPath.parse(response.body());
+        assertThat(problem.read("$.status", Integer.class)).isEqualTo(400);
+        assertThat(problem.read("$.title", String.class)).isEqualTo("Requisição inválida");
+        assertThat(problem.read("$.detail", String.class))
+                .isEqualTo("Corpo da requisição inválido ou malformado");
+        assertThat(response.body()).doesNotContain(
+                "invalid-marker", "JSON parse error", "Cannot deserialize", "com.fasterxml",
+                "tools.jackson", "java.util.UUID", "stackTrace", "exception");
+        assertThat(jdbc.queryForObject("select count(*) from loans", Long.class)).isEqualTo(loanCount);
+        assertThat(jdbc.queryForObject("select count(*) from loan_books", Long.class)).isEqualTo(bookCount);
+    }
+
     @Test
     void upgradesExistingV1DataWithoutLosingLoanOrBooks() {
         var config = Flyway.configure().dataSource(
@@ -145,9 +194,34 @@ class LoanIntegrationIT {
                 .isEqualTo(book);
     }
 
+    @Autowired LoanService loanService;
     @Autowired LoanRepository loans;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbc;
+
+    @Test
+    void rollsBackLoanAndBooksAfterFlushingServiceCreation() {
+        var tx = new TransactionTemplate(transactionManager);
+        var savedId = new AtomicReference<UUID>();
+        var books = Set.of(UUID.randomUUID(), UUID.randomUUID());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            var response = loanService.create(UUID.randomUUID(), UUID.randomUUID(), books,
+                    Instant.now().plusSeconds(86400));
+            savedId.set(response.id());
+            loans.flush();
+            assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
+                    Long.class, savedId.get())).isEqualTo(1L);
+            assertThat(jdbc.queryForList("select book_id from loan_books where loan_id = ?",
+                    UUID.class, savedId.get())).containsExactlyInAnyOrderElementsOf(books);
+            throw new IllegalStateException("rollback-probe");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("rollback-probe");
+
+        assertThat(savedId.get()).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
+                Long.class, savedId.get())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from loan_books where loan_id = ?",
+                Long.class, savedId.get())).isZero();
+    }
 
     @Test
     void staleTransactionCannotOverwriteCommittedWinner() {

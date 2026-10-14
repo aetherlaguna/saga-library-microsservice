@@ -32,28 +32,65 @@ com versões antigas. Use infraestrutura isolada para executar entregas antigas.
 - [x] Testes de domínio, HTTP, concorrência, migrations e conexão AMQP isolada.
 - [x] Workflow GitHub Actions para push e pull request.
 
-Evidência local: 14 testes Java e 4 Python aprovados, sem testes ignorados.
-Commits da suíte e CI: `cb41d04` e `adcd7d2`. Isso não comprova o resultado
-da execução remota do workflow nem a configuração do ambiente de desenvolvimento.
+Evidência local atual: 24 testes Java e 4 Python aprovados, sem testes ignorados.
+Commits iniciais da suíte e CI: `cb41d04` e `adcd7d2`. O usuário confirmou
+o CI aprovado no GitHub. A conexão AMQP local também foi validada pelo script.
 Eventos de negócio, catalog, outbox/inbox e Saga distribuída ainda não existem.
 
 ## Sprint 1 — Consolidar a base
 
-Estado: planejada.
+Estado: concluída e validada localmente. Publicação e CI dos novos commits
+ainda pendentes; o CI anterior foi confirmado pelo usuário.
 
-- [ ] Conferir o resultado do workflow no GitHub e corrigir falhas, se houver.
-- [ ] Concluir configuração AMQP local com credenciais e permissões adequadas.
-- [ ] Inspecionar os nós existentes e validar persistência da identidade RabbitMQ.
-- [ ] Validar o diagnóstico AMQP com credencial correta, incorreta e recuperação.
-- [ ] Definir e testar contratos para JSON malformado e UUID inválido.
-- [ ] Definir quando se aplica 404 e documentar que hoje só existe POST /loans.
-- [ ] Testar rollback transacional sem tocar o banco de desenvolvimento.
+- [x] Conferir o resultado do workflow no GitHub e corrigir falhas, se houver.
+- [x] Concluir configuração AMQP local com credenciais e permissões adequadas.
+- [x] Inspecionar os nós existentes e validar persistência da identidade RabbitMQ.
+- [x] Validar o diagnóstico AMQP com credencial correta, incorreta e recuperação.
+- [x] Definir e testar contratos para JSON malformado e UUID inválido.
+- [x] Definir quando se aplica 404 e documentar que hoje só existe POST /loans.
+- [x] Testar rollback transacional sem tocar o banco de desenvolvimento.
 
 Aceite: CI verde, ambiente conectado ao broker, erros HTTP consistentes e
 validações operacionais registradas sem expor segredos. Mudanças de contas ou
 credenciais existentes exigem autorização específica quando ainda não concedida.
 
-Evidências / commit de encerramento / pendências: a preencher.
+Evidências:
+
+- CI aprovado no GitHub, conforme confirmação do usuário; os novos commits
+  precisam passar novamente quando enviados.
+- `.env` local ignorado pelo Git; `loans_app` configurado com permissões em `/`
+  e acesso ao painel sem tag de administrador. Senha do PostgreSQL preservada.
+- `./scripts/check-amqp.sh`: health global/db/rabbit UP e conexão AMQP running.
+- Dois diretórios de nós encontrados no volume existente; identidade ativa
+  preservada. Na validação final, apenas o broker foi recriado, com a mesma
+  imagem, hostname, nó e volume. PostgreSQL não foi recriado.
+- `e3eee79`: handler 400 com ProblemDetail fixo e nove casos HTTP de corpo/formato
+  inválido, sem exposição do valor inválido ou detalhes do parser; nenhuma linha
+  criada em loans ou loan_books nesses cenários.
+- `dbd431c`: rollback após criação pelo serviço e flush; empréstimo e livros são
+  visíveis dentro da transação e ausentes após a falha.
+- `./mvnw -B -o -Pintegration clean verify`: 24 testes Java aprovados com banco e
+  broker descartáveis; testes Python: 4 aprovados. Nenhum teste ignorado.
+- Contrato 404: ainda não existe GET /loans/{id} nem consulta por ID. Uma rota
+  inexistente pode retornar 404 do framework; isso não representa uma busca
+  de empréstimo ausente. O contrato de recurso ausente será definido com a consulta.
+
+- Senha incorreta aplicada somente em loans via override temporário: HTTP 503,
+  db UP, rabbit DOWN e diagnóstico com saída 1. Após restauração: HTTP 200 e
+  diagnóstico aprovado. `.env` e container do broker inalterados nesse teste.
+- Snapshot consistente do volume com broker parado, protegido fora do repositório;
+  mesma imagem usada na recriação. Usuários, permissões, vhosts, exchanges,
+  bindings e filas comparados antes/depois sem divergências.
+- Fila durável e mensagem persistente de teste sobreviveram à recriação;
+  payload e delivery_mode=2 conferidos. Somente a fila temporária foi removida.
+- Diagnóstico final aprovado; hash do `.env` e ID do container PostgreSQL inalterados.
+
+Procedimento e evidências: [validação operacional da Sprint 1](SPRINT1-VALIDATION.md).
+Referência de encerramento local: commit que adiciona esse relatório e marca
+esta checklist como concluída. Nenhuma tag foi criada.
+
+Pendência de publicação: enviar os novos commits e conferir o respectivo CI.
+Isso não autoriza iniciar automaticamente a sprint 2.
 
 ## Sprint 2 — Contratos e outbox de loans
 

@@ -52,6 +52,24 @@ Não use o health agregado como liveness.
 
 Eventos, outbox/inbox, catalog e Saga distribuída ainda não estão implementados.
 
+## Contrato de erros HTTP
+
+A aplicação expõe `POST /loans` para criação. Erros tratados retornam
+`application/problem+json`:
+
+| Situação | Status | Resposta |
+|---|---|---|
+| JSON malformado, corpo vazio/null, UUID ou data ilegível, formato incompatível | 400 | Título `Requisição inválida`, detalhe fixo `Corpo da requisição inválido ou malformado` |
+| Campos que violam as validações do DTO | 400 | Título `Dados inválidos`, lista `errors` com `field` e `message` |
+| Regra de domínio inválida | 400 | Título `Empréstimo inválido`, descrição da regra |
+| Conflito otimista | 409 | Título `Conflito de atualização`, orientação para recarregar e tentar novamente |
+
+Erros de leitura não devolvem valores recebidos nem mensagens internas do parser.
+Não existe `GET /loans/{id}`: 404 de uma rota inexistente não significa que houve
+consulta por um empréstimo ausente. Esse contrato será definido quando a consulta
+for implementada. O handler 409 prepara futuras atualizações; seu teste HTTP usa
+um controller exclusivo de teste.
+
 ## Identidade persistente do RabbitMQ
 
 Antes de recriar um broker existente, identifique seu nó e diretório de dados:
@@ -90,10 +108,11 @@ Quando o usuário é compartilhado com o bootstrap ou outros clientes, a lista d
 broker isoladamente não identifica a origem da conexão; o health `rabbit`
 confirma o acesso de loans.
 
-Validação operacional pendente: executar com credenciais corretas e depois com
-uma credencial incorreta somente em loans, confirmando falha do diagnóstico.
-Restaure a configuração e confirme recuperação. Faça isso em ambiente de teste,
-sem interromper o broker nem alterar senhas do volume de desenvolvimento.
+Validação operacional concluída: credencial correta, incorreta somente em
+loans e recuperação, além de persistência após recriação do broker com backup.
+Veja as [evidências da Sprint 1](docs/SPRINT1-VALIDATION.md). O teste não alterou
+as senhas do broker ou do PostgreSQL. Novas execuções com falhas deliberadas
+devem ser planejadas, pois interrompem temporariamente o acesso da aplicação.
 
 ## Testes
 
@@ -113,7 +132,8 @@ Docker é obrigatório para integração; indisponibilidade provoca falha, não
 um teste ignorado.
 
 A integração cobre criação HTTP 201/PENDING e associação dos livros, rejeição
-400 por campo sem persistência, liveness/readiness e conexão AMQP real, criação
+400 por campo e entradas ilegíveis sem persistência, rollback após flush de
+empréstimo e livros, liveness/readiness e conexão AMQP real, criação
 do schema via Flyway, atualização V1 → V2 preservando dados e controle otimista
 entre transações independentes. A transação perdedora não sobrescreve o estado,
 a versão nem os livros do vencedor. O teste HTTP 409 usa um controller de teste:
@@ -125,9 +145,9 @@ Na raiz, com Python 3 e jq, execute os testes do diagnóstico sem Docker/rede:
 python3 -B -m unittest discover -s scripts/tests -v
 ```
 
-Validação local: 14 testes Java e 4 testes Python passaram, sem falhas ou testes
-ignorados. A validação dos containers de desenvolvimento e do script com suas
-credenciais continua separada desses testes isolados.
+Validação local: 24 testes Java e 4 testes Python passaram, sem falhas ou testes
+ignorados. A validação operacional local também foi concluída e registrada
+separadamente nos relatórios da Sprint 1.
 
 ## Testes a cada push
 

@@ -3,6 +3,7 @@ package com.library.loans.api;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -12,6 +13,15 @@ import com.library.loans.domain.InvalidLoanException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                "Corpo da requisição inválido ou malformado");
+        problem.setTitle("Requisição inválida");
+        return problem;
+    }
+
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail handleConcurrentUpdate(OptimisticLockingFailureException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -20,7 +30,6 @@ public class ApiExceptionHandler {
         problem.setTitle("Conflito de atualização");
         return problem;
     }
-
 
     @ExceptionHandler(InvalidLoanException.class)
     public ProblemDetail handleInvalidLoan(
