@@ -116,3 +116,10 @@ A suíte integration usa somente PostgreSQL/RabbitMQ descartáveis. Testa:
 Reinício do contexto Spring e da aplicação RabbitMQ não equivale a testar perda
 definitiva de disco ou morte abrupta de todo o host. O restart físico com volume
 preservado foi validado separadamente na Sprint 1.
+
+## Outbox de catalog
+
+A Sprint 3 adicionou um adaptador local em catalog, com o mesmo protocolo de
+publicação e tabelas próprias. SagaId, correlationId e causationId recebidos são
+persistidos e preservados no resultado, sem recalculá-los como loanId. Não existe
+acesso à outbox de loans. Consulte [CATALOG.md](CATALOG.md).

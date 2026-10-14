@@ -32,11 +32,13 @@ com versões antigas. Use infraestrutura isolada para executar entregas antigas.
 - [x] Testes de domínio, HTTP, concorrência, migrations e conexão AMQP isolada.
 - [x] Workflow GitHub Actions para push e pull request.
 
-Evidência local atual: 42 testes Java e 4 Python aprovados, sem testes ignorados.
+Evidência local atual: 42 testes Java de loans, 44 de catalog e 4 Python
+aprovados, sem testes ignorados.
 Commits iniciais da suíte e CI: `cb41d04` e `adcd7d2`. O usuário confirmou
 o CI aprovado no GitHub. A conexão AMQP local também foi validada pelo script.
-A Sprint 2 adicionou LoanRequested e outbox de loans. Catalog, inbox e Saga
-distribuída ainda não existem.
+A Sprint 2 adicionou LoanRequested e outbox de loans. A Sprint 3 adicionou
+catalog, reserva, inbox e outbox de resultados. Consumo de resultados em loans
+e Saga distribuída completa continuam nas próximas sprints.
 
 ## Sprint 1 — Consolidar a base
 
@@ -93,8 +95,8 @@ Publicação concluída pela PR #1. O usuário autorizou a Sprint 2 separadament
 
 ## Sprint 2 — Contratos e outbox de loans
 
-Estado: concluída e validada localmente na branch `sprint/2-outbox`.
-Publicação, PR e CI desta sprint ainda pendentes; nenhum deploy foi realizado.
+Estado: concluída, integrada pela PR #2 em main (`346a6a6`), com os dois checks
+de testes aprovados. Nenhum deploy em desenvolvimento foi realizado.
 
 - [x] Definir envelope versionado, payloads, correlationId, causationId e sagaId.
 - [x] Confirmar topologia: exchange durável library.events e routing keys versionadas.
@@ -141,20 +143,59 @@ propagação de tracing ainda precisam ser evoluídas.
 
 ## Sprint 3 — Acervo e reserva atômica
 
-Estado: planejada. Depende da sprint 2 e da definição de estoque/reserva.
+Estado: concluída e validada localmente na branch `sprint/3-catalog`, sob a
+premissa mínima abaixo. Push, PR e CI remoto desta sprint continuam pendentes.
+A Sprint 2 foi integrada pela PR #2 (`346a6a6`), com checks aprovados.
 
-- [ ] Criar catalog com banco, credenciais, migrations e serviço Compose próprios.
-- [ ] Modelar títulos, cópias disponíveis e vínculo com biblioteca conforme decisão.
-- [ ] Consumir LoanRequested com inbox transacional e reserva única por loanId.
-- [ ] Reservar todos os títulos atomicamente ou recusar sem reserva parcial.
-- [ ] Gravar BooksReserved ou BooksReservationRejected via outbox local.
-- [ ] Confirmar entrega AMQP somente após commit e testar reentrega/duplicação.
-- [ ] Testar disputa simultânea pelo estoque com PostgreSQL real.
+Premissa mínima comunicada enquanto a decisão de estoque continua aberta:
+uma biblioteca única, estoque agregado por título e quantidade 1 por título
+em cada empréstimo. Book identifica título; cópias físicas não recebem IDs.
+O vínculo à biblioteca é o escopo único da instância de catalog, sem seleção de
+unidade no evento v1. Isso não encerra as decisões de múltiplas bibliotecas ou
+exemplares. A evolução exige nova decisão e contrato explícito.
 
-Aceite: não há estoque excedido, reserva parcial silenciosa ou reserva duplicada.
-Nenhum serviço acessa diretamente tabelas do outro.
+- [x] Criar catalog com banco, credenciais configuráveis, migrations e Compose próprios.
+- [x] Modelar títulos e cópias disponíveis no escopo de biblioteca única, sob a premissa acima.
+- [x] Consumir LoanRequested com inbox transacional e reserva única por loanId.
+- [x] Reservar todos os títulos atomicamente ou recusar sem reserva parcial.
+- [x] Gravar BooksReserved ou BooksReservationRejected via outbox local.
+- [x] Confirmar entrega AMQP somente após commit e testar reentrega/duplicação.
+- [x] Testar disputa simultânea pelo estoque com PostgreSQL real.
 
-Evidências / commit de encerramento / pendências: a preencher.
+Aceite local: não há estoque excedido, reserva parcial silenciosa ou reserva
+duplicada nos cenários testados. Nenhum serviço acessa tabelas do outro.
+Estoque reservado só será liberado com futura compensação/devolução. Não foram
+criadas regras de elegibilidade, limites por membro, multas ou prazo máximo.
+
+Evidências e commits:
+
+- `606d356`: serviço catalog, Maven Wrapper/Dockerfile próprios, API de títulos
+  e banco com restrições de estoque.
+- `53210c4`: inbox, reserva all-or-nothing, outbox e consumidor com ack após commit;
+  testes de falhas, concorrência, reentrega e contratos.
+- `50012a7`: compose.catalog.yaml, variáveis próprias e RabbitMQ fixado em 4.3.6,
+  versão já observada no ambiente local. O arquivo base continua independente.
+- `d25492a`: CI executa catalog e loans, com cache e relatórios de ambos.
+- `./mvnw -B -o -Pintegration clean verify`: 44 testes de catalog e 42 de loans
+  aprovados, sem falhas ou testes ignorados. Diagnóstico Python: 4 aprovados.
+- Smoke com os dois Dockerfiles e Compose descartável: primeiro pedido reservado,
+  segundo recusado por falta de estoque, resultados persistidos na fila de loans,
+  outboxes SENT e empréstimos ainda PENDING conforme escopo da Sprint 3.
+- Credenciais/volumes dos testes eram exclusivos e descartáveis. Hash do `.env`
+  e IDs dos containers de desenvolvimento preservados; sem deploy ou migration
+  nos bancos de desenvolvimento.
+
+Documentos: [catalog e operação](CATALOG.md), [contratos](EVENTS.md) e
+[evidências de validação](SPRINT3-VALIDATION.md).
+
+Pendências para uso local: configurar as três variáveis de catalog, provisionar
+seu usuário AMQP próprio e iniciar os dois arquivos Compose. Não foram criadas
+contas nem alteradas credenciais existentes. Quedas longas do banco podem levar
+solicitações válidas à DLQ; o runbook de replay preserva eventId e exige
+confirmação da republicação antes de confirmar a mensagem original.
+
+Consumo de resultados em loans, ACTIVE/CANCELLED e deduplicação desses resultados
+permanecem na Sprint 4. Compensação, timeout e reconciliação permanecem na Sprint 5.
 
 ## Sprint 4 — Saga ponta a ponta
 
