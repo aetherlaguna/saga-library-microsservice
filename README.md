@@ -4,7 +4,7 @@ Microsserviço `loans` com Java 25, Spring Boot, PostgreSQL e RabbitMQ.
 
 ## Execução local
 
-Copie `.env.example` para `.env` e preencha as três variáveis. Em volumes
+Copie `.env.example` para `.env` e preencha as variáveis. Em volumes
 existentes, informe as credenciais já configuradas: as variáveis de bootstrap
 não alteram senhas armazenadas no PostgreSQL ou usuários existentes no RabbitMQ.
 Não remova volumes para corrigir autenticação.
@@ -44,3 +44,24 @@ a concorrência real ainda precisa de teste entre transações independentes.
 A exposição de detalhes do Actuator é destinada ao diagnóstico local.
 
 Eventos, outbox/inbox, catalog e Saga distribuída ainda não estão implementados.
+
+## Identidade persistente do RabbitMQ
+
+Antes de recriar um broker existente, identifique seu nó e diretório de dados:
+
+```sh
+docker compose exec rabbitmq hostname
+docker compose exec rabbitmq rabbitmqctl eval 'node().'
+docker compose exec rabbitmq rabbitmq-diagnostics data_directory
+docker compose exec rabbitmq ls /var/lib/rabbitmq/mnesia/
+```
+
+Configure `RABBITMQ_HOSTNAME` com o hostname do nó que contém os dados válidos,
+sem o prefixo `rabbit@`. Para um volume novo, use `rabbitmq`. Se houver vários
+diretórios de nós, investigue qual contém os dados antes de iniciar o broker.
+Faça backup do volume antes de qualquer mudança de identidade. Não use um nome
+novo para um volume existente: isso pode iniciar um nó vazio no mesmo volume.
+O DNS usado pela aplicação continua sendo o nome do serviço `rabbitmq`.
+
+Após uma recriação planejada, confirme a mesma identidade, usuários, filas e
+conexão AMQP. Não combine essa operação com atualização da imagem do broker.

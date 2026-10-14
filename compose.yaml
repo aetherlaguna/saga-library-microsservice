@@ -33,6 +33,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management
+    hostname: ${RABBITMQ_HOSTNAME:?Defina o hostname do no RabbitMQ no .env}
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD no .env}
