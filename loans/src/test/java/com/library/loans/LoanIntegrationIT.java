@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import org.flywaydb.core.Flyway;
@@ -37,6 +38,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.jayway.jsonpath.JsonPath;
 import com.library.loans.domain.Loan;
 import com.library.loans.repository.LoanRepository;
+import com.library.loans.service.LoanService;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -192,9 +194,34 @@ class LoanIntegrationIT {
                 .isEqualTo(book);
     }
 
+    @Autowired LoanService loanService;
     @Autowired LoanRepository loans;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbc;
+
+    @Test
+    void rollsBackLoanAndBooksAfterFlushingServiceCreation() {
+        var tx = new TransactionTemplate(transactionManager);
+        var savedId = new AtomicReference<UUID>();
+        var books = Set.of(UUID.randomUUID(), UUID.randomUUID());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            var response = loanService.create(UUID.randomUUID(), UUID.randomUUID(), books,
+                    Instant.now().plusSeconds(86400));
+            savedId.set(response.id());
+            loans.flush();
+            assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
+                    Long.class, savedId.get())).isEqualTo(1L);
+            assertThat(jdbc.queryForList("select book_id from loan_books where loan_id = ?",
+                    UUID.class, savedId.get())).containsExactlyInAnyOrderElementsOf(books);
+            throw new IllegalStateException("rollback-probe");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("rollback-probe");
+
+        assertThat(savedId.get()).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
+                Long.class, savedId.get())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from loan_books where loan_id = ?",
+                Long.class, savedId.get())).isZero();
+    }
 
     @Test
     void staleTransactionCannotOverwriteCommittedWinner() {
