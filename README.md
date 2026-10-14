@@ -55,7 +55,7 @@ Antes de recriar um broker existente, identifique seu nó e diretório de dados:
 ```sh
 docker compose exec rabbitmq hostname
 docker compose exec rabbitmq rabbitmqctl eval 'node().'
-docker compose exec rabbitmq rabbitmq-diagnostics data_directory
+docker compose exec rabbitmq rabbitmqctl eval 'application:get_env(rabbit, mnesia_dir).'
 docker compose exec rabbitmq ls /var/lib/rabbitmq/mnesia/
 ```
 
@@ -82,8 +82,9 @@ conexão `running` do usuário configurado no container loans, no vhost `/`.
 Não imprime senhas nem o JSON de diagnóstico. Retorna 0 em sucesso, 1 para
 falha de verificação e 2 para pré-requisito/configuração/serviço indisponível.
 O profile local deve estar ativo para os componentes ficarem visíveis.
-Como o usuário é compartilhado com o bootstrap, a lista do broker isoladamente
-não identifica a origem da conexão; o health `rabbit` confirma o acesso de loans.
+Quando o usuário é compartilhado com o bootstrap ou outros clientes, a lista do
+broker isoladamente não identifica a origem da conexão; o health `rabbit`
+confirma o acesso de loans.
 
 Validação operacional pendente: executar com credenciais corretas e depois com
 uma credencial incorreta somente em loans, confirmando falha do diagnóstico.
@@ -111,6 +112,10 @@ vencedor. Verifica versão e associações por SQL. O teste HTTP isolado confirm
 409 sem detalhes internos para conflitos otimistas. Ainda não há endpoint de
 atualização: esse contrato prepara o tratamento de futuras operações.
 
-Pendências operacionais: executar o perfil de integração com Docker disponível,
-validar migração de um banco previamente na V1 e executar o diagnóstico AMQP
-com os serviços reais. Compilação e testes HTTP não substituem essas verificações.
+Verificado em 14/10/2026 UTC: `./mvnw -B -o -Pintegration clean test` passou
+com PostgreSQL 17 descartável: migrations V1/V2, concorrência entre transações e
+contrato HTTP 409 (2 testes, sem falhas ou testes ignorados).
+
+Pendências operacionais: validar migração de um banco previamente na V1 e
+executar o diagnóstico AMQP com os serviços reais. O teste de concorrência não
+substitui essas verificações.
