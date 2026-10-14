@@ -1,5 +1,6 @@
 package com.library.loans.api;
 
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,6 +11,16 @@ import com.library.loans.domain.InvalidLoanException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleConcurrentUpdate(OptimisticLockingFailureException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "O empréstimo foi alterado por outra operação; recarregue e tente novamente");
+        problem.setTitle("Conflito de atualização");
+        return problem;
+    }
+
 
     @ExceptionHandler(InvalidLoanException.class)
     public ProblemDetail handleInvalidLoan(
