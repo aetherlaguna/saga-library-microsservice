@@ -2,6 +2,9 @@
 
 Microsserviço `loans` com Java 25, Spring Boot, PostgreSQL e RabbitMQ.
 
+O [planejamento das sprints](docs/SPRINTS.md) reúne backlog, checklists, critérios
+de aceite e referências Git para acompanhar as entregas.
+
 ## Execução local
 
 Copie `.env.example` para `.env` e preencha as variáveis. Em volumes
@@ -40,7 +43,8 @@ Evite compartilhar logs ou saídas de configuração que possam conter segredos.
 
 A configuração conecta loans ao host `rabbitmq:5672` pela rede Compose e exige
 credenciais externas. A migration V2 e `@Version` adicionam controle otimista;
-a concorrência real ainda precisa de teste entre transações independentes.
+a concorrência entre transações independentes foi validada com PostgreSQL
+descartável nos testes de integração.
 O Compose ativa explicitamente o profile `local`, que expõe detalhes do
 Actuator e métricas. Fora desse profile, somente health é exposto, sem detalhes.
 Liveness verifica o estado da aplicação; readiness inclui banco e RabbitMQ.
