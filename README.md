@@ -108,10 +108,11 @@ Quando o usuário é compartilhado com o bootstrap ou outros clientes, a lista d
 broker isoladamente não identifica a origem da conexão; o health `rabbit`
 confirma o acesso de loans.
 
-Validação operacional pendente: executar com credenciais corretas e depois com
-uma credencial incorreta somente em loans, confirmando falha do diagnóstico.
-Restaure a configuração e confirme recuperação. Faça isso em ambiente de teste,
-sem interromper o broker nem alterar senhas do volume de desenvolvimento.
+Validação operacional concluída: credencial correta, incorreta somente em
+loans e recuperação, além de persistência após recriação do broker com backup.
+Veja as [evidências da Sprint 1](docs/SPRINT1-VALIDATION.md). O teste não alterou
+as senhas do broker ou do PostgreSQL. Novas execuções com falhas deliberadas
+devem ser planejadas, pois interrompem temporariamente o acesso da aplicação.
 
 ## Testes
 
@@ -145,8 +146,8 @@ python3 -B -m unittest discover -s scripts/tests -v
 ```
 
 Validação local: 24 testes Java e 4 testes Python passaram, sem falhas ou testes
-ignorados. A validação dos containers de desenvolvimento e do script com suas
-credenciais continua separada desses testes isolados.
+ignorados. A validação operacional local também foi concluída e registrada
+separadamente nos relatórios da Sprint 1.
 
 ## Testes a cada push
 

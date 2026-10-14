@@ -39,13 +39,13 @@ Eventos de negócio, catalog, outbox/inbox e Saga distribuída ainda não existe
 
 ## Sprint 1 — Consolidar a base
 
-Estado: em andamento; implementação HTTP e rollback concluídos, com duas
-validações operacionais ainda pendentes.
+Estado: concluída e validada localmente. Publicação e CI dos novos commits
+ainda pendentes; o CI anterior foi confirmado pelo usuário.
 
 - [x] Conferir o resultado do workflow no GitHub e corrigir falhas, se houver.
 - [x] Concluir configuração AMQP local com credenciais e permissões adequadas.
-- [ ] Inspecionar os nós existentes e validar persistência da identidade RabbitMQ.
-- [ ] Validar o diagnóstico AMQP com credencial correta, incorreta e recuperação.
+- [x] Inspecionar os nós existentes e validar persistência da identidade RabbitMQ.
+- [x] Validar o diagnóstico AMQP com credencial correta, incorreta e recuperação.
 - [x] Definir e testar contratos para JSON malformado e UUID inválido.
 - [x] Definir quando se aplica 404 e documentar que hoje só existe POST /loans.
 - [x] Testar rollback transacional sem tocar o banco de desenvolvimento.
@@ -62,7 +62,8 @@ Evidências:
   e acesso ao painel sem tag de administrador. Senha do PostgreSQL preservada.
 - `./scripts/check-amqp.sh`: health global/db/rabbit UP e conexão AMQP running.
 - Dois diretórios de nós encontrados no volume existente; identidade ativa
-  preservada. Banco e broker não foram recriados durante a configuração.
+  preservada. Na validação final, apenas o broker foi recriado, com a mesma
+  imagem, hostname, nó e volume. PostgreSQL não foi recriado.
 - `e3eee79`: handler 400 com ProblemDetail fixo e nove casos HTTP de corpo/formato
   inválido, sem exposição do valor inválido ou detalhes do parser; nenhuma linha
   criada em loans ou loan_books nesses cenários.
@@ -74,12 +75,22 @@ Evidências:
   inexistente pode retornar 404 do framework; isso não representa uma busca
   de empréstimo ausente. O contrato de recurso ausente será definido com a consulta.
 
-Pendências: comprovar persistência da identidade/dados após recriação controlada
-sem apagar volumes; validar credencial incorreta e recuperação do diagnóstico
-em ambiente de teste. A execução positiva já foi validada no ambiente local.
-Não marcar a sprint como encerrada antes dessas verificações.
+- Senha incorreta aplicada somente em loans via override temporário: HTTP 503,
+  db UP, rabbit DOWN e diagnóstico com saída 1. Após restauração: HTTP 200 e
+  diagnóstico aprovado. `.env` e container do broker inalterados nesse teste.
+- Snapshot consistente do volume com broker parado, protegido fora do repositório;
+  mesma imagem usada na recriação. Usuários, permissões, vhosts, exchanges,
+  bindings e filas comparados antes/depois sem divergências.
+- Fila durável e mensagem persistente de teste sobreviveram à recriação;
+  payload e delivery_mode=2 conferidos. Somente a fila temporária foi removida.
+- Diagnóstico final aprovado; hash do `.env` e ID do container PostgreSQL inalterados.
 
-Commit de encerramento: ainda não definido.
+Procedimento e evidências: [validação operacional da Sprint 1](SPRINT1-VALIDATION.md).
+Referência de encerramento local: commit que adiciona esse relatório e marca
+esta checklist como concluída. Nenhuma tag foi criada.
+
+Pendência de publicação: enviar os novos commits e conferir o respectivo CI.
+Isso não autoriza iniciar automaticamente a sprint 2.
 
 ## Sprint 2 — Contratos e outbox de loans
 
