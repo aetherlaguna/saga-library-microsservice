@@ -41,7 +41,10 @@ Evite compartilhar logs ou saídas de configuração que possam conter segredos.
 A configuração conecta loans ao host `rabbitmq:5672` pela rede Compose e exige
 credenciais externas. A migration V2 e `@Version` adicionam controle otimista;
 a concorrência real ainda precisa de teste entre transações independentes.
-A exposição de detalhes do Actuator é destinada ao diagnóstico local.
+O Compose ativa explicitamente o profile `local`, que expõe detalhes do
+Actuator e métricas. Fora desse profile, somente health é exposto, sem detalhes.
+Liveness verifica o estado da aplicação; readiness inclui banco e RabbitMQ.
+Não use o health agregado como liveness.
 
 Eventos, outbox/inbox, catalog e Saga distribuída ainda não estão implementados.
 
