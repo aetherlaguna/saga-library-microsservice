@@ -51,7 +51,7 @@ class LoanIntegrationIT {
     private static final String AMQP_PASSWORD = UUID.randomUUID().toString();
 
     @Container
-    static final GenericContainer<?> RABBIT = new GenericContainer<>("rabbitmq:4-management")
+    static final GenericContainer<?> RABBIT = new GenericContainer<>("rabbitmq:4.3.6-management")
             .withEnv("RABBITMQ_DEFAULT_USER", AMQP_USER)
             .withEnv("RABBITMQ_DEFAULT_PASS", AMQP_PASSWORD)
             .withExposedPorts(5672)
