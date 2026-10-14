@@ -124,3 +124,23 @@ python3 -B -m unittest discover -s scripts/tests -v
 Validação local: 14 testes Java e 4 testes Python passaram, sem falhas ou testes
 ignorados. A validação dos containers de desenvolvimento e do script com suas
 credenciais continua separada desses testes isolados.
+
+## Testes a cada push
+
+O workflow [Tests](.github/workflows/tests.yml) executa em todo push, pull request
+e também manualmente pela aba Actions do GitHub. Usa Ubuntu, Java Temurin 25,
+cache Maven e o Docker do runner para os containers descartáveis. Não requer
+secrets do repositório nem o arquivo `.env`.
+
+Executa os testes Python do diagnóstico e `./mvnw -B -ntp -Pintegration clean verify`.
+Se um teste falhar, o job falha. Os relatórios Surefire ficam disponíveis no
+artefato `test-reports` por sete dias. Docker e jq são verificados antes da suíte
+para impedir sucesso aparente por ausência de pré-requisitos.
+
+A execução no GitHub começa após enviar o commit do workflow ao repositório,
+com GitHub Actions habilitado. O workflow não publica a aplicação nem faz deploy.
+Para impedir merges com testes falhando, configure separadamente a proteção da
+branch exigindo o check `Java 25, PostgreSQL e RabbitMQ`.
+
+Referências: [Maven no GitHub Actions](https://docs.github.com/en/actions/tutorials/build-and-test-code/java-with-maven)
+e [configuração do Java e cache Maven](https://github.com/actions/setup-java).

@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Java 25, PostgreSQL e RabbitMQ
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: loans/pom.xml
+
+      - name: Verificar ferramentas
+        run: |
+          docker info > /dev/null
+          command -v jq
+          python3 --version
+
+      - name: Testar diagnóstico AMQP
+        run: |
+          bash -n scripts/check-amqp.sh
+          python3 -B -m unittest discover -s scripts/tests -v
+
+      - name: Testar aplicação com infraestrutura descartável
+        working-directory: loans
+        run: ./mvnw -B -ntp -Pintegration clean verify
+
+      - name: Guardar relatórios de teste
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: loans/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
