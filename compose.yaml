@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: loans
       POSTGRES_USER: loans
-      POSTGRES_PASSWORD: secure_pass
+      POSTGRES_PASSWORD: ${LOANS_DB_PASSWORD:?Defina LOANS_DB_PASSWORD no .env}
     volumes:
       - loans-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -20,10 +20,33 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://loans-db:5432/loans
       SPRING_DATASOURCE_USERNAME: loans
-      SPRING_DATASOURCE_PASSWORD: secure_pass
+      SPRING_DATASOURCE_PASSWORD: ${LOANS_DB_PASSWORD:?Defina LOANS_DB_PASSWORD no .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD no .env}
     depends_on:
       loans-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD no .env}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 volumes:
   loans-db-data:
+  rabbitmq-data:
