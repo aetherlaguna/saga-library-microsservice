@@ -89,3 +89,28 @@ Validação operacional pendente: executar com credenciais corretas e depois com
 uma credencial incorreta somente em loans, confirmando falha do diagnóstico.
 Restaure a configuração e confirme recuperação. Faça isso em ambiente de teste,
 sem interromper o broker nem alterar senhas do volume de desenvolvimento.
+
+## Testes
+
+No diretório `loans`, com Java 25:
+
+```sh
+./mvnw clean test
+./mvnw -Pintegration test
+```
+
+O primeiro comando executa testes sem infraestrutura. O segundo inclui
+`LoanConcurrencyIT`, que sobe PostgreSQL 17 descartável com Testcontainers,
+aplica migrations e carrega o contexto da aplicação com `ddl-auto=validate`.
+Não usa o banco de desenvolvimento. Docker é obrigatório: indisponibilidade
+provoca falha, não teste ignorado. Em CI, execute também o perfil `integration`.
+
+O teste mantém uma transação com a versão antiga, confirma uma segunda
+transação independente e exige que a primeira falhe sem sobrescrever o
+vencedor. Verifica versão e associações por SQL. O teste HTTP isolado confirma
+409 sem detalhes internos para conflitos otimistas. Ainda não há endpoint de
+atualização: esse contrato prepara o tratamento de futuras operações.
+
+Pendências operacionais: executar o perfil de integração com Docker disponível,
+validar migração de um banco previamente na V1 e executar o diagnóstico AMQP
+com os serviços reais. Compilação e testes HTTP não substituem essas verificações.
