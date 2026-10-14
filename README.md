@@ -68,3 +68,24 @@ O DNS usado pela aplicação continua sendo o nome do serviço `rabbitmq`.
 
 Após uma recriação planejada, confirme a mesma identidade, usuários, filas e
 conexão AMQP. Não combine essa operação com atualização da imagem do broker.
+
+## Verificação da conexão AMQP
+
+Com Docker, curl e jq instalados, ambiente configurado e serviços em execução:
+
+```sh
+./scripts/check-amqp.sh
+```
+
+O script consulta o health antes das conexões, exige global/db/rabbit UP e uma
+conexão `running` do usuário configurado no container loans, no vhost `/`.
+Não imprime senhas nem o JSON de diagnóstico. Retorna 0 em sucesso, 1 para
+falha de verificação e 2 para pré-requisito/configuração/serviço indisponível.
+O profile local deve estar ativo para os componentes ficarem visíveis.
+Como o usuário é compartilhado com o bootstrap, a lista do broker isoladamente
+não identifica a origem da conexão; o health `rabbit` confirma o acesso de loans.
+
+Validação operacional pendente: executar com credenciais corretas e depois com
+uma credencial incorreta somente em loans, confirmando falha do diagnóstico.
+Restaure a configuração e confirme recuperação. Faça isso em ambiente de teste,
+sem interromper o broker nem alterar senhas do volume de desenvolvimento.
