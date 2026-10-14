@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.library.loans.api.dto.LoanResponse;
 import com.library.loans.domain.Loan;
+import com.library.loans.messaging.LoanRequested;
+import com.library.loans.outbox.OutboxStore;
 import com.library.loans.repository.LoanRepository;
 
 @Service
@@ -21,10 +23,12 @@ public class LoanService {
 
     private final LoanRepository loanRepository;
     private final Clock clock;
+    private final OutboxStore outbox;
 
-    public LoanService(LoanRepository loanRepository, Clock clock) {
+    public LoanService(LoanRepository loanRepository, Clock clock, OutboxStore outbox) {
         this.loanRepository = loanRepository;
         this.clock = clock;
+        this.outbox = outbox;
     }
 
     @Transactional
@@ -41,7 +45,8 @@ public class LoanService {
                 Instant.now(clock),
                 dueAt);
 
-        Loan savedLoan = loanRepository.save(loan);
+        Loan savedLoan = loanRepository.saveAndFlush(loan);
+        outbox.append(LoanRequested.from(savedLoan));
 
         log.debug(
                 "Empréstimo preparado para persistência: loanId={}, status={}",

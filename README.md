@@ -47,10 +47,22 @@ a concorrência entre transações independentes foi validada com PostgreSQL
 descartável nos testes de integração.
 O Compose ativa explicitamente o profile `local`, que expõe detalhes do
 Actuator e métricas. Fora desse profile, somente health é exposto, sem detalhes.
-Liveness verifica o estado da aplicação; readiness inclui banco e RabbitMQ.
-Não use o health agregado como liveness.
+Liveness verifica o estado da aplicação; readiness inclui banco e estado da
+aplicação. RabbitMQ fica no health geral, permitindo criar solicitações com
+outbox durante indisponibilidade do broker. Não use o health agregado como
+liveness.
 
-Eventos, outbox/inbox, catalog e Saga distribuída ainda não estão implementados.
+LoanRequested, outbox transacional e publicação com confirmações estão
+implementados. Consulte os [contratos de eventos](docs/EVENTS.md) e o
+[funcionamento e replay da outbox](docs/OUTBOX.md). O worker publica na fila
+durável de solicitações do catálogo, com retries e DLQ configurados.
+
+Inbox, consumidor de catalog e Saga distribuída ainda não estão implementados.
+201/PENDING continua significando apenas solicitação criada. Publicar o evento
+não ativa o empréstimo; mensagens ficarão na fila até a implementação do consumidor.
+A migration V3 cria a outbox; V1/V2 não foram alteradas. A topologia é declarada
+aditivamente quando a aplicação conecta ao broker; não apagar filas/volumes para
+resolver uma declaração incompatível.
 
 ## Contrato de erros HTTP
 
@@ -124,8 +136,9 @@ No diretório `loans`, com Java 25:
 ```
 
 O primeiro comando executa testes sem infraestrutura: criação, validação de
-campos e datas, proteção das coleções, transições de estado e conflito HTTP 409.
-O segundo também executa `LoanIntegrationIT`, com PostgreSQL 17 e RabbitMQ 4
+campos e datas, proteção das coleções, transições, conflito HTTP 409 e tratamento
+de confirms, returns, nack, timeout e interrupção no publisher.
+O segundo executa `LoanIntegrationIT` e `OutboxIntegrationIT`, com PostgreSQL 17 e RabbitMQ 4
 descartáveis via Testcontainers, portas dinâmicas e credenciais de teste.
 Não usa `.env`, credenciais, containers ou volumes de desenvolvimento.
 Docker é obrigatório para integração; indisponibilidade provoca falha, não
@@ -134,10 +147,15 @@ um teste ignorado.
 A integração cobre criação HTTP 201/PENDING e associação dos livros, rejeição
 400 por campo e entradas ilegíveis sem persistência, rollback após flush de
 empréstimo e livros, liveness/readiness e conexão AMQP real, criação
-do schema via Flyway, atualização V1 → V2 preservando dados e controle otimista
+do schema via Flyway, atualização V1 → V3 preservando dados e controle otimista
 entre transações independentes. A transação perdedora não sobrescreve o estado,
 a versão nem os livros do vencedor. O teste HTTP 409 usa um controller de teste:
 ainda não há endpoint de atualização na aplicação.
+
+A suíte de outbox também cobre criação durante broker indisponível, recuperação
+automática em novo contexto, duplicação após confirmação sem marcação de envio,
+workers concorrentes, estacionamento/replay, persistência após restart do broker
+e DLQ. Readiness segue UP durante a falha do broker; o health geral fica DOWN.
 
 Na raiz, com Python 3 e jq, execute os testes do diagnóstico sem Docker/rede:
 
@@ -145,7 +163,7 @@ Na raiz, com Python 3 e jq, execute os testes do diagnóstico sem Docker/rede:
 python3 -B -m unittest discover -s scripts/tests -v
 ```
 
-Validação local: 24 testes Java e 4 testes Python passaram, sem falhas ou testes
+Validação local da Sprint 2: 42 testes Java e 4 testes Python passaram, sem falhas ou testes
 ignorados. A validação operacional local também foi concluída e registrada
 separadamente nos relatórios da Sprint 1.
 

@@ -32,15 +32,15 @@ com versões antigas. Use infraestrutura isolada para executar entregas antigas.
 - [x] Testes de domínio, HTTP, concorrência, migrations e conexão AMQP isolada.
 - [x] Workflow GitHub Actions para push e pull request.
 
-Evidência local atual: 24 testes Java e 4 Python aprovados, sem testes ignorados.
+Evidência local atual: 42 testes Java e 4 Python aprovados, sem testes ignorados.
 Commits iniciais da suíte e CI: `cb41d04` e `adcd7d2`. O usuário confirmou
 o CI aprovado no GitHub. A conexão AMQP local também foi validada pelo script.
-Eventos de negócio, catalog, outbox/inbox e Saga distribuída ainda não existem.
+A Sprint 2 adicionou LoanRequested e outbox de loans. Catalog, inbox e Saga
+distribuída ainda não existem.
 
 ## Sprint 1 — Consolidar a base
 
-Estado: concluída e validada localmente. Publicação e CI dos novos commits
-ainda pendentes; o CI anterior foi confirmado pelo usuário.
+Estado: concluída, integrada pela PR #1 em main (`df142e4`), com CI aprovado.
 
 - [x] Conferir o resultado do workflow no GitHub e corrigir falhas, se houver.
 - [x] Concluir configuração AMQP local com credenciais e permissões adequadas.
@@ -56,8 +56,8 @@ credenciais existentes exigem autorização específica quando ainda não conced
 
 Evidências:
 
-- CI aprovado no GitHub, conforme confirmação do usuário; os novos commits
-  precisam passar novamente quando enviados.
+- CI da PR #1 aprovado: os dois checks de testes retornaram SUCCESS,
+  verificados antes da implementação da Sprint 2.
 - `.env` local ignorado pelo Git; `loans_app` configurado com permissões em `/`
   e acesso ao painel sem tag de administrador. Senha do PostgreSQL preservada.
 - `./scripts/check-amqp.sh`: health global/db/rabbit UP e conexão AMQP running.
@@ -89,26 +89,55 @@ Procedimento e evidências: [validação operacional da Sprint 1](SPRINT1-VALIDA
 Referência de encerramento local: commit que adiciona esse relatório e marca
 esta checklist como concluída. Nenhuma tag foi criada.
 
-Pendência de publicação: enviar os novos commits e conferir o respectivo CI.
-Isso não autoriza iniciar automaticamente a sprint 2.
+Publicação concluída pela PR #1. O usuário autorizou a Sprint 2 separadamente.
 
 ## Sprint 2 — Contratos e outbox de loans
 
-Estado: planejada. Depende da sprint 1 e das decisões necessárias ao contrato.
+Estado: concluída e validada localmente na branch `sprint/2-outbox`.
+Publicação, PR e CI desta sprint ainda pendentes; nenhum deploy foi realizado.
 
-- [ ] Definir envelope versionado, payloads, correlationId, causationId e sagaId.
-- [ ] Confirmar topologia: exchange durável library.events e routing keys versionadas.
-- [ ] Definir filas consumidoras, mensagens persistentes, retry limitado e DLQ.
-- [ ] Gravar LoanRequested na outbox na mesma transação do empréstimo PENDING.
-- [ ] Implementar publicação com confirms e tratamento de mensagens não roteadas.
-- [ ] Marcar envio apenas após confirmação e permitir recuperação após falha.
-- [ ] Testar broker indisponível, reinício e possibilidade de publicação duplicada.
+- [x] Definir envelope versionado, payloads, correlationId, causationId e sagaId.
+- [x] Confirmar topologia: exchange durável library.events e routing keys versionadas.
+- [x] Definir filas consumidoras, mensagens persistentes, retry limitado e DLQ.
+- [x] Gravar LoanRequested na outbox na mesma transação do empréstimo PENDING.
+- [x] Implementar publicação com confirms e tratamento de mensagens não roteadas.
+- [x] Marcar envio apenas após confirmação e permitir recuperação após falha.
+- [x] Testar broker indisponível, reinício e possibilidade de publicação duplicada.
 
-Aceite: uma indisponibilidade do broker não perde eventos; publicação recupera
-sem assumir atomicidade entre transação JPA e RabbitMQ. Deduplicação de efeitos
-será concluída nos consumidores.
+Aceite local: uma indisponibilidade do broker não perde eventos; publicação
+recupera sem assumir atomicidade entre transação JPA e RabbitMQ. Deduplicação
+de efeitos será concluída nos consumidores. Retry de infraestrutura permanece
+ativo com backoff limitado; falhas específicas da mensagem podem ir para PARKED,
+com replay explícito. Nada é removido automaticamente da outbox.
 
-Evidências / commit de encerramento / pendências: a preencher.
+Decisões técnicas: sagaId=loanId, correlationId=loanId no primeiro evento e
+causationId=null; filas quorum; loans declara inicialmente a assinatura de
+catalog com contrato de argumentos fixo, para não depender da Sprint 3 para rotear.
+Readiness verifica aplicação/banco, sem depender do broker para receber PENDING.
+Nenhuma política de estoque, prazo, autenticação ou multa foi criada.
+
+Evidências e commits:
+
+- `5e7144c`: envelope LoanRequested, topologia durável, quorum/DLQ e contrato.
+- `7f78fcb`: V3 e escrita transacional da outbox; rollback conjunto verificado.
+- `a1b66cb`: publisher com confirms/returns, worker agendado, retry, estacionamento
+  e replay, além dos testes de falhas/concorrência.
+- `./mvnw -B -o -Pintegration clean verify`: 42 testes Java aprovados, sem testes
+  ignorados, com PostgreSQL/RabbitMQ descartáveis. Python: 4 testes aprovados.
+- Criação HTTP com broker indisponível retornou 201; readiness 200 e health geral
+  503. Mais falhas de infraestrutura que o limite de mensagem não estacionaram
+  o evento. Um contexto novo com scheduler ativo recuperou o envio.
+- Falha no UPDATE de SENT após ack produziu duas mensagens com mesmo eventId/corpo.
+- Testes de worker concorrente, mensagem após restart do broker, rejeição/limite
+  de reentregas, DLQ e replay preservando eventId aprovados.
+
+Documentos: [contratos de eventos](EVENTS.md) e [outbox/replay](OUTBOX.md).
+
+Limites: consumidor, inbox, reserva do acervo, transição para ACTIVE/CANCELLED,
+compensação, timeout e reconciliação continuam nas próximas sprints. A aplicação
+local de desenvolvimento permanece na imagem anterior; V3/topologia novas foram
+aplicadas apenas nos ambientes descartáveis de teste. A retenção da outbox e a
+propagação de tracing ainda precisam ser evoluídas.
 
 ## Sprint 3 — Acervo e reserva atômica
 

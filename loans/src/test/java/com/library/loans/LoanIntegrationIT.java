@@ -40,7 +40,8 @@ import com.library.loans.domain.Loan;
 import com.library.loans.repository.LoanRepository;
 import com.library.loans.service.LoanService;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "library.outbox.enabled=false")
 @Testcontainers
 class LoanIntegrationIT {
     @Container
@@ -85,7 +86,7 @@ class LoanIntegrationIT {
     }
 
     @Test
-    void readinessChecksRealDatabaseAndBrokerWithoutExposingDetails() throws Exception {
+    void readinessChecksDatabaseWithoutExposingDetails() throws Exception {
         var readiness = request("/actuator/health/readiness", null);
         assertThat(readiness.statusCode()).isEqualTo(200);
         var json = JsonPath.parse(readiness.body());
@@ -209,6 +210,8 @@ class LoanIntegrationIT {
                     Instant.now().plusSeconds(86400));
             savedId.set(response.id());
             loans.flush();
+            assertThat(jdbc.queryForObject("select count(*) from outbox_events where loan_id = ?",
+                    Long.class, savedId.get())).isEqualTo(1L);
             assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
                     Long.class, savedId.get())).isEqualTo(1L);
             assertThat(jdbc.queryForList("select book_id from loan_books where loan_id = ?",
@@ -217,6 +220,8 @@ class LoanIntegrationIT {
         })).isInstanceOf(IllegalStateException.class).hasMessage("rollback-probe");
 
         assertThat(savedId.get()).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where loan_id = ?",
+                Long.class, savedId.get())).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loans where id = ?",
                 Long.class, savedId.get())).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loan_books where loan_id = ?",

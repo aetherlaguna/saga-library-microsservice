@@ -62,3 +62,9 @@ Documentação dos contratos: `2162471`.
 Com estas evidências, todos os itens locais da checklist da Sprint 1 estão
 concluídos. O usuário confirmou o CI anterior; os novos commits ainda precisam
 ser enviados ao GitHub e aprovados pelo workflow correspondente.
+
+## Publicação posterior
+
+A PR #1 foi integrada em main no commit `df142e4`. Os dois checks de testes da
+PR retornaram SUCCESS, conferidos ao iniciar a Sprint 2. A pendência de publicação
+descrita no encerramento local acima foi resolvida.
