@@ -1,7 +1,7 @@
 # Contratos de eventos — versão 1
 
-Contrato inicial da Sprint 2. Implementado: LoanRequested. Os eventos de resultado
-de catalog e de compensação continuam previstos para sprints posteriores.
+Contratos das Sprints 2 e 3. Implementados: LoanRequested, BooksReserved e
+BooksReservationRejected. Eventos de compensação continuam nas próximas sprints.
 Não compartilhar entidades JPA nem acessar bancos de outros serviços.
 
 ## Envelope de LoanRequested
@@ -55,9 +55,9 @@ separada do eventId. Propagação de tracing será concluída na sprint de obser
 | Routing key de dead letter | catalog.loan-requests.v1.dead |
 | DLQ | catalog.loan-requests.v1.dlq, quorum, durável |
 
-Nesta fatia, loans declara a topologia inicial da assinatura para que publicações
-confirmadas tenham uma fila durável antes de existir o consumidor. Catalog deverá
-reutilizar exatamente o mesmo contrato quando for criado. Réplicas do mesmo
+Loans e catalog declaram a mesma assinatura, com argumentos idênticos,
+verificados em integração com os dois serviços no mesmo broker. Loans conserva
+a declaração para publicar mesmo com catalog fora do ar. Réplicas do mesmo
 consumidor compartilham fila; outra assinatura independente precisa de sua fila.
 Não há alternate-exchange: mensagem sem rota precisa retornar ao publisher.
 
@@ -65,7 +65,8 @@ A fila fonte define x-delivery-limit=3, x-dead-letter-strategy=at-least-once,
 x-overflow=reject-publish e os argumentos de DLX/routing key. Isso impede um
 ciclo ilimitado de falhas de entrega e mantém mensagens em dead-letter até sua
 confirmação pelo destino. A DLQ não reencaminha automaticamente para a origem.
-Não há consumidor de negócio nem deduplicação ainda.
+Catalog possui consumidor e inbox transacional. O consumidor de resultados em
+loans permanece na Sprint 4.
 
 No RabbitMQ 4.3, basic.nack com requeue não conta como entrega falhada para esse
 limite. O consumidor futuro deve usar basic.reject com requeue=true para falha
@@ -78,11 +79,52 @@ incompatíveis em uma fila existente nem apagá-la para resolver divergência.
 Uma evolução deve planejar migração de mensagens. Policies permitem ajustes
 operacionais em vários argumentos, mas não substituem o tipo quorum da fila.
 
+## Resultados publicados por catalog
+
+Os resultados usam o mesmo envelope v1, com novo eventId, loanId da solicitação,
+sagaId/correlationId preservados e causationId igual ao eventId de LoanRequested.
+OccurredAt vem do Clock UTC de catalog. MessageId é o novo eventId e appId é catalog.
+
+BooksReserved, routing key `catalog.books-reserved.v1`:
+
+```json
+{
+  "reservationId": "8f385191-579f-42c3-b482-a2a31cb87a36",
+  "bookIds": ["3c76da82-00e0-4dad-9175-5842a944e4e3"]
+}
+```
+
+BooksReservationRejected, routing key `catalog.reservation-rejected.v1`:
+
+```json
+{
+  "reasonCode": "BOOKS_UNAVAILABLE",
+  "unavailableBookIds": ["3c76da82-00e0-4dad-9175-5842a944e4e3"]
+}
+```
+
+Os JSONs acima representam apenas payload; os demais campos ficam no envelope.
+Título inexistente e sem estoque são recusas de negócio com a mesma razão estável.
+Não há reserva parcial nem dados pessoais no resultado. Reutilização conflitante
+de eventId/loanId é erro de protocolo enviado à DLQ, sem um segundo resultado.
+
+A fila `loans.catalog-results.v1` liga as duas routing keys ao exchange library.events.
+É quorum/durável, com x-delivery-limit=3, x-dead-letter-strategy=at-least-once,
+x-overflow=reject-publish, DLX library.events.dlx e key loans.catalog-results.v1.dead.
+A DLQ `loans.catalog-results.v1.dlq` também é quorum/durável. Catalog declara essa
+assinatura inicialmente; loans deverá manter os mesmos argumentos na Sprint 4.
+
+Premissa de estoque da Sprint 3: uma biblioteca única, quantidade por título,
+sem identificação de exemplares. LibraryId não foi adicionado silenciosamente ao
+v1. Múltiplas unidades/exemplares exigem decisão e evolução explícita de versão.
+Detalhes de reserva, inbox, conflitos e replay: [CATALOG.md](CATALOG.md).
+
 ## Limites da entrega
 
 Publicação é at-least-once: confirmações não tornam PostgreSQL e RabbitMQ uma
 única transação. A janela entre confirmar e marcar SENT permite duplicação com
-o mesmo eventId. A inbox de catalog, na Sprint 3, deverá impedir efeitos repetidos.
+o mesmo eventId. A inbox e a reserva única por loanId em catalog impedem repetir o desconto
+de estoque. A deduplicação de resultados em loans permanece na Sprint 4.
 Um confirm comprova aceitação pelo broker, não processamento pelo catalog.
 
 A topologia é durável, mas o Compose tem um único broker; quorum em um único nó

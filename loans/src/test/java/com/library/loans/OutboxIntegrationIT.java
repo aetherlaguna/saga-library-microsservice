@@ -55,7 +55,7 @@ class OutboxIntegrationIT {
     private static final String USER = "test_" + UUID.randomUUID();
     private static final String PASSWORD = UUID.randomUUID().toString();
     @Container static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17");
-    @Container static final GenericContainer<?> RABBIT = new GenericContainer<>("rabbitmq:4-management")
+    @Container static final GenericContainer<?> RABBIT = new GenericContainer<>("rabbitmq:4.3.6-management")
             .withEnv("RABBITMQ_DEFAULT_USER", USER).withEnv("RABBITMQ_DEFAULT_PASS", PASSWORD)
             .withExposedPorts(5672).waitingFor(Wait.forLogMessage(".*Server startup complete.*", 1))
             .withStartupTimeout(Duration.ofMinutes(2));

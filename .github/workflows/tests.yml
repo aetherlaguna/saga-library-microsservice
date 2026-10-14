@@ -23,7 +23,9 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-          cache-dependency-path: loans/pom.xml
+          cache-dependency-path: |
+            loans/pom.xml
+            catalog/pom.xml
 
       - name: Verificar ferramentas
         run: |
@@ -40,11 +42,17 @@ jobs:
         working-directory: loans
         run: ./mvnw -B -ntp -Pintegration clean verify
 
+      - name: Testar catálogo com infraestrutura descartável
+        working-directory: catalog
+        run: ./mvnw -B -ntp -Pintegration clean verify
+
       - name: Guardar relatórios de teste
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: loans/target/surefire-reports/
+          path: |
+            loans/target/surefire-reports/
+            catalog/target/surefire-reports/
           if-no-files-found: ignore
           retention-days: 7

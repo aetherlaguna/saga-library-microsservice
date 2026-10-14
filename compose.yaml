@@ -33,7 +33,7 @@ services:
         condition: service_healthy
 
   rabbitmq:
-    image: rabbitmq:4-management
+    image: rabbitmq:4.3.6-management
     hostname: ${RABBITMQ_HOSTNAME:?Defina o hostname do no RabbitMQ no .env}
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}

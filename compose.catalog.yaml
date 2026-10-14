@@ -1,0 +1,38 @@
+# Complemento: docker compose -f compose.yaml -f compose.catalog.yaml up -d --build
+services:
+  catalog-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD:?Defina CATALOG_DB_PASSWORD no .env}
+    volumes:
+      - catalog-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog -d catalog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  catalog:
+    build:
+      context: ./catalog
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://catalog-db:5432/catalog
+      SPRING_DATASOURCE_USERNAME: catalog
+      SPRING_DATASOURCE_PASSWORD: ${CATALOG_DB_PASSWORD:?Defina CATALOG_DB_PASSWORD no .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${CATALOG_RABBITMQ_USER:?Defina CATALOG_RABBITMQ_USER no .env}
+      SPRING_RABBITMQ_PASSWORD: ${CATALOG_RABBITMQ_PASSWORD:?Defina CATALOG_RABBITMQ_PASSWORD no .env}
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  catalog-db-data:

@@ -7,7 +7,7 @@ de aceite e referências Git para acompanhar as entregas.
 
 ## Execução local
 
-Copie `.env.example` para `.env` e preencha as variáveis. Em volumes
+Se não houver `.env`, copie `.env.example` para `.env` e preencha as variáveis. Em volumes
 existentes, informe as credenciais já configuradas: as variáveis de bootstrap
 não alteram senhas armazenadas no PostgreSQL ou usuários existentes no RabbitMQ.
 Não remova volumes para corrigir autenticação.
@@ -57,9 +57,17 @@ implementados. Consulte os [contratos de eventos](docs/EVENTS.md) e o
 [funcionamento e replay da outbox](docs/OUTBOX.md). O worker publica na fila
 durável de solicitações do catálogo, com retries e DLQ configurados.
 
-Inbox, consumidor de catalog e Saga distribuída ainda não estão implementados.
-201/PENDING continua significando apenas solicitação criada. Publicar o evento
-não ativa o empréstimo; mensagens ficarão na fila até a implementação do consumidor.
+Catalog possui API de títulos, estoque, consumidor de LoanRequested e inbox/outbox
+transacionais, com reserva de todos os livros ou recusa sem efeito parcial.
+Consulte [modelo, API e execução de catalog](docs/CATALOG.md). Para iniciar o par,
+inclua `-f compose.catalog.yaml` junto com `-f compose.yaml`, após configurar as
+credenciais exclusivas de catalog. O arquivo base continua funcionando isoladamente.
+
+A premissa mínima é uma biblioteca única, com cópias por título. 201/PENDING
+continua significando solicitação criada: loans ainda não consome os resultados.
+Os resultados ficam em `loans.catalog-results.v1` até a Sprint 4. Compensação,
+timeout, liberação de estoque e Saga distribuída completa permanecem nas próximas
+sprints. Nenhuma migration foi aplicada aos bancos de desenvolvimento nesta entrega.
 A migration V3 cria a outbox; V1/V2 não foram alteradas. A topologia é declarada
 aditivamente quando a aplicação conecta ao broker; não apagar filas/volumes para
 resolver uma declaração incompatível.
@@ -135,7 +143,8 @@ No diretório `loans`, com Java 25:
 ./mvnw -Pintegration clean verify
 ```
 
-O primeiro comando executa testes sem infraestrutura: criação, validação de
+Esses comandos também estão disponíveis no diretório `catalog`, com Maven Wrapper
+próprio. O primeiro comando executa testes sem infraestrutura: criação, validação de
 campos e datas, proteção das coleções, transições, conflito HTTP 409 e tratamento
 de confirms, returns, nack, timeout e interrupção no publisher.
 O segundo executa `LoanIntegrationIT` e `OutboxIntegrationIT`, com PostgreSQL 17 e RabbitMQ 4
@@ -163,8 +172,9 @@ Na raiz, com Python 3 e jq, execute os testes do diagnóstico sem Docker/rede:
 python3 -B -m unittest discover -s scripts/tests -v
 ```
 
-Validação local da Sprint 2: 42 testes Java e 4 testes Python passaram, sem falhas ou testes
-ignorados. A validação operacional local também foi concluída e registrada
+Validação local da Sprint 3: 42 testes Java em loans, 44 em catalog e 4 testes
+Python passaram, sem falhas ou testes ignorados. O smoke test com os dois
+Dockerfiles e Compose descartável também passou. A validação operacional local também foi concluída e registrada
 separadamente nos relatórios da Sprint 1.
 
 ## Testes a cada push
@@ -174,7 +184,8 @@ e também manualmente pela aba Actions do GitHub. Usa Ubuntu, Java Temurin 25,
 cache Maven e o Docker do runner para os containers descartáveis. Não requer
 secrets do repositório nem o arquivo `.env`.
 
-Executa os testes Python do diagnóstico e `./mvnw -B -ntp -Pintegration clean verify`.
+Executa os testes Python do diagnóstico e `./mvnw -B -ntp -Pintegration clean verify`
+em loans e em catalog.
 Se um teste falhar, o job falha. Os relatórios Surefire ficam disponíveis no
 artefato `test-reports` por sete dias. Docker e jq são verificados antes da suíte
 para impedir sucesso aparente por ausência de pré-requisitos.
