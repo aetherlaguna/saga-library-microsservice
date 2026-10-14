@@ -97,25 +97,30 @@ No diretório `loans`, com Java 25:
 
 ```sh
 ./mvnw clean test
-./mvnw -Pintegration test
+./mvnw -Pintegration clean verify
 ```
 
-O primeiro comando executa testes sem infraestrutura. O segundo inclui
-`LoanConcurrencyIT`, que sobe PostgreSQL 17 descartável com Testcontainers,
-aplica migrations e carrega o contexto da aplicação com `ddl-auto=validate`.
-Não usa o banco de desenvolvimento. Docker é obrigatório: indisponibilidade
-provoca falha, não teste ignorado. Em CI, execute também o perfil `integration`.
+O primeiro comando executa testes sem infraestrutura: criação, validação de
+campos e datas, proteção das coleções, transições de estado e conflito HTTP 409.
+O segundo também executa `LoanIntegrationIT`, com PostgreSQL 17 e RabbitMQ 4
+descartáveis via Testcontainers, portas dinâmicas e credenciais de teste.
+Não usa `.env`, credenciais, containers ou volumes de desenvolvimento.
+Docker é obrigatório para integração; indisponibilidade provoca falha, não
+um teste ignorado.
 
-O teste mantém uma transação com a versão antiga, confirma uma segunda
-transação independente e exige que a primeira falhe sem sobrescrever o
-vencedor. Verifica versão e associações por SQL. O teste HTTP isolado confirma
-409 sem detalhes internos para conflitos otimistas. Ainda não há endpoint de
-atualização: esse contrato prepara o tratamento de futuras operações.
+A integração cobre criação HTTP 201/PENDING e associação dos livros, rejeição
+400 por campo sem persistência, liveness/readiness e conexão AMQP real, criação
+do schema via Flyway, atualização V1 → V2 preservando dados e controle otimista
+entre transações independentes. A transação perdedora não sobrescreve o estado,
+a versão nem os livros do vencedor. O teste HTTP 409 usa um controller de teste:
+ainda não há endpoint de atualização na aplicação.
 
-Verificado em 14/10/2026 UTC: `./mvnw -B -o -Pintegration clean test` passou
-com PostgreSQL 17 descartável: migrations V1/V2, concorrência entre transações e
-contrato HTTP 409 (2 testes, sem falhas ou testes ignorados).
+Na raiz, com Python 3 e jq, execute os testes do diagnóstico sem Docker/rede:
 
-Pendências operacionais: validar migração de um banco previamente na V1 e
-executar o diagnóstico AMQP com os serviços reais. O teste de concorrência não
-substitui essas verificações.
+```sh
+python3 -B -m unittest discover -s scripts/tests -v
+```
+
+Validação local: 14 testes Java e 4 testes Python passaram, sem falhas ou testes
+ignorados. A validação dos containers de desenvolvimento e do script com suas
+credenciais continua separada desses testes isolados.
