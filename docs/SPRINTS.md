@@ -261,3 +261,10 @@ Evidências / commit de encerramento / pendências: a preencher.
 Planejar separadamente membros e autenticação; consulta e devolução; renovação;
 e multas. Não criar um microsserviço por entidade ou inventar regras financeiras.
 Essas entregas dependem das decisões acima e de novo escopo autorizado.
+
+## Trilha separada — Frontend Angular
+
+O frontend tem numeração e critérios próprios, sem alterar as Sprints 1–6 do
+backend. O plano está em [sprints do frontend Angular](FRONTEND-SPRINTS.md).
+As dependências de APIs e da Saga estão indicadas em cada entrega. A criação
+desse plano não inicia automaticamente a implementação.
