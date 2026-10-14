@@ -26,6 +26,6 @@ user=$(docker compose exec -T loans printenv SPRING_RABBITMQ_USERNAME) || fail '
 connections=$(docker compose exec -T rabbitmq rabbitmqctl -q list_connections \
   --no-table-headers user vhost state) || fail 'Não foi possível consultar conexões AMQP.'
 jq -Rse --arg user "$user" \
-  'split("\n") | any(split("\t"); .[0] == $user and .[1] == "/" and .[2] == "running")' \
+  'split("\n") | any(.[] | split("\t"); .[0] == $user and .[1] == "/" and .[2] == "running")' \
   >/dev/null <<< "$connections" || fail 'Nenhuma conexão running do usuário configurado no vhost /.'
 printf 'OK: conexão AMQP running do usuário configurado em /.\n'
