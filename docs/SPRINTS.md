@@ -32,7 +32,7 @@ com versões antigas. Use infraestrutura isolada para executar entregas antigas.
 - [x] Testes de domínio, HTTP, concorrência, migrations e conexão AMQP isolada.
 - [x] Workflow GitHub Actions para push e pull request.
 
-Evidência local atual: 42 testes Java de loans, 44 de catalog e 4 Python
+Evidência local atual: 61 testes Java de loans, 44 de catalog e 4 Python
 aprovados, sem testes ignorados.
 Commits iniciais da suíte e CI: `cb41d04` e `adcd7d2`. O usuário confirmou
 o CI aprovado no GitHub. A conexão AMQP local também foi validada pelo script.
@@ -199,19 +199,24 @@ permanecem na Sprint 4. Compensação, timeout e reconciliação permanecem na S
 
 ## Sprint 4 — Saga ponta a ponta
 
-Estado: planejada. Depende da sprint 3.
+Estado: concluída e validada localmente na branch `sprint/4-loan-results`.
+Sem push/PR/CI remoto; baseada na entrega local da Sprint 3.
 
-- [ ] Consumir resultados de catalog em loans com inbox e deduplicação.
-- [ ] Aplicar ACTIVE quando todas as pré-condições forem atendidas, ou CANCELLED na recusa.
-- [ ] Tratar conflito otimista com releitura e retry limitado.
-- [ ] Validar roteamento, ack após commit, retry e DLQ nos dois serviços.
-- [ ] Testar sucesso, recusa, mensagens duplicadas e reinício dos serviços.
+- [x] Consumir resultados de catalog em loans com inbox e deduplicação.
+- [x] Aplicar ACTIVE quando todas as pré-condições forem atendidas, ou CANCELLED na recusa.
+- [x] Tratar conflito otimista com releitura e retry limitado.
+- [x] Validar roteamento, ack após commit, retry e DLQ nos dois serviços.
+- [x] Testar sucesso, recusa, mensagens duplicadas e reinício dos serviços.
 
 Aceite: o fluxo pelo Compose converge para ACTIVE ou CANCELLED nos cenários
 cobertos, sem repetir efeitos. Timeout e compensação ainda dependem da sprint 5;
 a entrega desta sprint não representa a Saga completa para falhas tardias.
 
-Evidências / commit de encerramento / pendências: a preencher.
+Evidências: [validação da Sprint 4](SPRINT4-VALIDATION.md) e
+[consumo de resultados](LOAN-RESULTS.md). Loans: 61 testes; catalog: 44;
+diagnóstico Python: 4, todos aprovados. Smoke Compose isolado convergiu para
+ACTIVE/CANCELLED. Implementação em 61b41c0, 340f3e6 e 4e73524; encerramento no
+commit deste relatório. Timeout e compensação permanecem na Sprint 5.
 
 ## Sprint 5 — Compensação e recuperação
 
