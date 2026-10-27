@@ -66,4 +66,11 @@ public class LoanService {
                 savedLoan.getDueAt(),
                 savedLoan.getReturnedAt());
     }
+    @Transactional(readOnly=true)
+    public LoanResponse find(UUID id) {
+        var loan=loanRepository.findById(id).orElseThrow(LoanNotFound::new);
+        return new LoanResponse(loan.getId(),loan.getMemberId(),loan.getRegisteredBy(),loan.getBookIds(),
+                loan.getStatus(),loan.getCreatedAt(),loan.getDueAt(),loan.getReturnedAt());
+    }
+
 }

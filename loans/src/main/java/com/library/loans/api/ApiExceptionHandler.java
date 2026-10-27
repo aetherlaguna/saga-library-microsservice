@@ -68,4 +68,11 @@ public class ApiExceptionHandler {
 
         return problem;
     }
+    @ExceptionHandler(com.library.loans.service.LoanNotFound.class)
+    public ProblemDetail handleNotFound(com.library.loans.service.LoanNotFound exception) {
+        var problem=ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,exception.getMessage());
+        problem.setTitle("Recurso não encontrado");
+        return problem;
+    }
+
 }
