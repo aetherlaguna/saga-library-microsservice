@@ -18,6 +18,10 @@ class CatalogResultListenerTest {
         var props=new MessageProperties(); props.setDeliveryTag(7); props.setReceivedRoutingKey(MessagingTopology.BOOKS_RESERVED);
         byte[] body={1}; var message=new Message(body,props);
         when(codec.decode(body)).thenReturn(result); when(result.reserved()).thenReturn(true);
+        var event=mock(LibraryEvent.class); when(result.event()).thenReturn(event);
+        when(event.loanId()).thenReturn(java.util.UUID.randomUUID());
+        when(event.sagaId()).thenReturn(java.util.UUID.randomUUID());
+        when(event.eventId()).thenReturn(java.util.UUID.randomUUID());
         listener.receive(message,channel);
         var ordered=inOrder(service,channel); ordered.verify(service).apply(result); ordered.verify(channel).basicAck(7,false);
         reset(channel);

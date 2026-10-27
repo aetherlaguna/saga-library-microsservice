@@ -13,6 +13,8 @@ import com.library.loans.repository.LoanRepository;
 @Service
 public class ReleaseResultService {
     private final JdbcTemplate jdbc; private final LoanRepository loans; private final Clock clock;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.library.loans.observability.SagaMetrics metrics;
     public ReleaseResultService(JdbcTemplate jdbc,LoanRepository loans,Clock clock) { this.jdbc=jdbc;this.loans=loans;this.clock=clock; }
     @Transactional public void confirm(LibraryEvent<Payload> e) {
         jdbc.query("select id from loans where id=? for update",(rs,i)->rs.getObject(1),e.loanId());
@@ -34,6 +36,7 @@ public class ReleaseResultService {
         if(!"WAITING_RELEASE".equals(saga.getFirst()[0])) throw new IllegalArgumentException("INVALID_SAGA_STATE");
         var loan=loans.findById(e.loanId()).orElseThrow();
         loan.cancel(); loans.flush();
+        metrics.completed(e.loanId());
         jdbc.update("update loan_sagas set state='COMPLETED',updated_at=? where loan_id=?",Timestamp.from(clock.instant()),e.loanId());
     }
 }

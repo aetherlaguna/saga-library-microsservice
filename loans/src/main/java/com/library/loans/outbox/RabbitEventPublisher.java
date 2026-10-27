@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RabbitEventPublisher implements EventPublisher {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.library.loans.observability.OutboxTracing tracing;
     private final RabbitTemplate rabbit;
     private final OutboxProperties properties;
 
@@ -26,6 +28,11 @@ public class RabbitEventPublisher implements EventPublisher {
 
     @Override
     public void publish(OutboxEvent event) {
+        if (tracing != null) tracing.publish(event.eventId(), () -> send(event));
+        else send(event);
+    }
+
+    private void send(OutboxEvent event) {
         var messageProperties = new MessageProperties();
         messageProperties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         messageProperties.setContentEncoding(StandardCharsets.UTF_8.name());

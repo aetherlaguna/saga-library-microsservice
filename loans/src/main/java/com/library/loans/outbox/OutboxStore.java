@@ -18,6 +18,8 @@ import com.library.loans.messaging.MessagingTopology;
 @Repository
 @Transactional(propagation = Propagation.MANDATORY)
 public class OutboxStore {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.library.loans.observability.OutboxTracing tracing;
     private final JdbcTemplate jdbc;
     private final JsonMapper mapper;
 
@@ -40,6 +42,8 @@ public class OutboxStore {
                 MessagingTopology.EVENTS, routingKey,
                 mapper.writeValueAsString(event), Timestamp.from(event.occurredAt()),
                 Timestamp.from(event.occurredAt()));
+        if (tracing != null) jdbc.update("update outbox_events set trace_headers=CAST(? AS jsonb) where event_id=?",
+                mapper.writeValueAsString(tracing.capture()),event.eventId());
     }
 
     public Optional<OutboxEvent> lockNext(Instant now) {

@@ -34,7 +34,11 @@ public class CatalogResultListener {
                 throw new InvalidCatalogResult("ROUTING_KEY_MISMATCH");
             }
             // apply() returns only after the transaction has committed.
-            results.apply(result);
+            try(var loanScope=org.slf4j.MDC.putCloseable("loanId",result.event().loanId().toString());
+                var sagaScope=org.slf4j.MDC.putCloseable("sagaId",result.event().sagaId().toString());
+                var eventScope=org.slf4j.MDC.putCloseable("eventId",result.event().eventId().toString())) {
+                results.apply(result);
+            }
         } catch (InvalidCatalogResult failure) {
             log.warn("Resultado de catalog rejeitado: reason={}", failure.getMessage());
             channel.basicReject(tag, false);

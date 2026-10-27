@@ -18,6 +18,8 @@ public class SagaRecovery {
     private final OutboxStore outbox;
     private final Clock clock;
     private final Duration timeout;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.library.loans.observability.SagaMetrics metrics;
     public SagaRecovery(JdbcTemplate jdbc, OutboxStore outbox, Clock clock,
             @Value("${loans.saga.timeout:5m}") Duration timeout) {
         if (timeout.compareTo(Duration.ofSeconds(1)) < 0) throw new IllegalArgumentException("Invalid saga timeout");
@@ -40,6 +42,7 @@ public class SagaRecovery {
     }
     @Transactional
     public void complete(UUID loanId) {
+        metrics.completed(loanId);
         jdbc.update("update loan_sagas set state='COMPLETED',updated_at=? where loan_id=?",
                 Timestamp.from(clock.instant()),loanId);
     }
