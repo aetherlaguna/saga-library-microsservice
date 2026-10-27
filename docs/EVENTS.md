@@ -142,3 +142,9 @@ Loans também declara a assinatura de resultados com argumentos idênticos aos d
 catalog. Inbox/decisão local e mudança de estado são transacionais; confirmação
 AMQP ocorre após commit. Ver [consumo de resultados](LOAN-RESULTS.md).
 As referências anteriores à Sprint 4 como futura descrevem o limite da Sprint 3.
+
+## Liberação e timeout (Sprint 5)
+
+BooksReleaseRequested e BooksReleased, filas e regras de reordenação estão em
+[recuperação da Saga](RECOVERY.md). O contexto W3C é persistido na outbox sem
+alterar o envelope v1; ver [observabilidade](OBSERVABILITY.md).

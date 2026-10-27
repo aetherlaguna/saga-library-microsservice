@@ -1,6 +1,9 @@
 # Biblioteca
 
-Microsserviço `loans` com Java 25, Spring Boot, PostgreSQL e RabbitMQ.
+Microsserviços `loans` e `catalog` com Java 25, Spring Boot, PostgreSQL e RabbitMQ.
+
+Recuperação da Saga: [compensação e timeout](docs/RECOVERY.md).
+Telemetria e aceite: [observabilidade](docs/OBSERVABILITY.md).
 
 O [planejamento das sprints](docs/SPRINTS.md) reúne backlog, checklists, critérios
 de aceite e referências Git para acompanhar as entregas.
@@ -46,7 +49,7 @@ credenciais externas. A migration V2 e `@Version` adicionam controle otimista;
 a concorrência entre transações independentes foi validada com PostgreSQL
 descartável nos testes de integração.
 O Compose ativa explicitamente o profile `local`, que expõe detalhes do
-Actuator e métricas. Fora desse profile, somente health é exposto, sem detalhes.
+Actuator e métricas. Fora desse profile, health sem detalhes e prometheus são expostos.
 Liveness verifica o estado da aplicação; readiness inclui banco e estado da
 aplicação. RabbitMQ fica no health geral, permitindo criar solicitações com
 outbox durante indisponibilidade do broker. Não use o health agregado como
