@@ -47,9 +47,10 @@ import com.library.loans.outbox.OutboxDispatcher;
 import com.library.loans.service.LoanService;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "library.outbox.enabled=false", "library.outbox.retry-delay-ms=10",
+        "loans.consumer.enabled=false", "library.outbox.enabled=false", "library.outbox.retry-delay-ms=10",
         "library.outbox.max-retry-delay-ms=50", "library.outbox.max-message-failures=3",
         "library.outbox.confirm-timeout-ms=1000"})
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class OutboxIntegrationIT {
     private static final String USER = "test_" + UUID.randomUUID();

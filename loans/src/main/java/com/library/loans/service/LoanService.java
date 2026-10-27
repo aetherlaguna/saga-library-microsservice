@@ -24,11 +24,13 @@ public class LoanService {
     private final LoanRepository loanRepository;
     private final Clock clock;
     private final OutboxStore outbox;
+    private final SagaRecovery recovery;
 
-    public LoanService(LoanRepository loanRepository, Clock clock, OutboxStore outbox) {
+    public LoanService(LoanRepository loanRepository, Clock clock, OutboxStore outbox, SagaRecovery recovery) {
         this.loanRepository = loanRepository;
         this.clock = clock;
         this.outbox = outbox;
+        this.recovery = recovery;
     }
 
     @Transactional
@@ -47,6 +49,7 @@ public class LoanService {
 
         Loan savedLoan = loanRepository.saveAndFlush(loan);
         outbox.append(LoanRequested.from(savedLoan));
+        recovery.register(savedLoan.getId());
 
         log.debug(
                 "Empréstimo preparado para persistência: loanId={}, status={}",
@@ -63,4 +66,11 @@ public class LoanService {
                 savedLoan.getDueAt(),
                 savedLoan.getReturnedAt());
     }
+    @Transactional(readOnly=true)
+    public LoanResponse find(UUID id) {
+        var loan=loanRepository.findById(id).orElseThrow(LoanNotFound::new);
+        return new LoanResponse(loan.getId(),loan.getMemberId(),loan.getRegisteredBy(),loan.getBookIds(),
+                loan.getStatus(),loan.getCreatedAt(),loan.getDueAt(),loan.getReturnedAt());
+    }
+
 }

@@ -1,0 +1,28 @@
+groups:
+  - name: library
+    rules:
+      - alert: LibraryServiceUnavailable
+        expr: up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Serviço indisponível para coleta"}
+      - alert: OutboxDeliveryDelayed
+        expr: library_outbox_age_seconds > 120
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Outbox sem entrega há mais de dois minutos"}
+      - alert: OutboxParked
+        expr: library_outbox_parked > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Evento estacionado exige investigação e replay"}
+      - alert: SagaRecoveryPending
+        expr: library_saga_overdue > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Saga ultrapassou o prazo e aguarda recuperação"}
+      - alert: DeadLettersPresent
+        expr: rabbitmq_queue_messages{queue=~".*dlq"} > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Mensagens na DLQ exigem investigação"}

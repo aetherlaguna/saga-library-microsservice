@@ -33,4 +33,9 @@ public class LoanController {
                 request.bookIds(),
                 request.dueAt());
     }
+    @org.springframework.web.bind.annotation.GetMapping("/{id}")
+    public LoanResponse find(@org.springframework.web.bind.annotation.PathVariable java.util.UUID id) {
+        return loanService.find(id);
+    }
+
 }

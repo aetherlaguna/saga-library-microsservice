@@ -135,3 +135,16 @@ precisam ser dimensionados com observabilidade.
 Referências oficiais: [confirms e returns no Spring AMQP](https://docs.spring.io/spring-amqp/reference/amqp/template.html),
 [CorrelationData](https://docs.spring.io/spring-amqp/docs/current/api/org/springframework/amqp/rabbit/connection/CorrelationData.html)
 e [filas quorum e delivery-limit](https://www.rabbitmq.com/docs/quorum-queues).
+
+## Consumo em loans (Sprint 4)
+
+Loans também declara a assinatura de resultados com argumentos idênticos aos de
+catalog. Inbox/decisão local e mudança de estado são transacionais; confirmação
+AMQP ocorre após commit. Ver [consumo de resultados](LOAN-RESULTS.md).
+As referências anteriores à Sprint 4 como futura descrevem o limite da Sprint 3.
+
+## Liberação e timeout (Sprint 5)
+
+BooksReleaseRequested e BooksReleased, filas e regras de reordenação estão em
+[recuperação da Saga](RECOVERY.md). O contexto W3C é persistido na outbox sem
+alterar o envelope v1; ver [observabilidade](OBSERVABILITY.md).

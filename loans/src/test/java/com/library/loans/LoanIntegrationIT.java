@@ -42,6 +42,7 @@ import com.library.loans.service.LoanService;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "library.outbox.enabled=false")
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class LoanIntegrationIT {
     @Container
@@ -189,6 +190,8 @@ class LoanIntegrationIT {
                 """, id, UUID.randomUUID(), UUID.randomUUID());
         jdbc.update("insert into upgrade_test.loan_books (loan_id, book_id) values (?, ?)", id, book);
         config.target("latest").load().migrate();
+        assertThat(jdbc.queryForObject("select state from upgrade_test.loan_sagas where loan_id=?",String.class,id))
+                .isEqualTo("MANUAL_REVIEW");
         assertThat(jdbc.queryForObject("select version from upgrade_test.loans where id = ?", Long.class, id))
                 .isZero();
         assertThat(jdbc.queryForObject("select book_id from upgrade_test.loan_books where loan_id = ?", UUID.class, id))
@@ -258,4 +261,18 @@ class LoanIntegrationIT {
         assertThat(jdbc.queryForList("select book_id from loan_books where loan_id = ?", UUID.class, id))
                 .containsExactlyInAnyOrderElementsOf(books);
     }
+    @Test void queriesPersistedLoanAndReturnsNotFoundForUnknownId() throws Exception {
+        UUID book=UUID.randomUUID();
+        var created=request("/loans","""
+            {"memberId":"%s","registeredBy":"%s","bookIds":["%s"],"dueAt":"2027-11-20T21:00:00Z"}
+            """.formatted(UUID.randomUUID(),UUID.randomUUID(),book));
+        String id=JsonPath.parse(created.body()).read("$.id",String.class);
+        var found=request("/loans/"+id,null);
+        assertThat(found.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.parse(found.body()).read("$.bookIds[0]",String.class)).isEqualTo(book.toString());
+        var missing=request("/loans/"+UUID.randomUUID(),null);
+        assertThat(missing.statusCode()).isEqualTo(404);
+        assertThat(missing.body()).contains("Recurso não encontrado").doesNotContain("stack_trace");
+    }
+
 }

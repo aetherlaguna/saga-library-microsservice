@@ -28,7 +28,12 @@ public class LoanRequestedListener {
         long tag = message.getMessageProperties().getDeliveryTag();
         try {
             // This call returns through a separate transactional proxy only after commit.
-            reservations.reserve(codec.decode(message.getBody()));
+            var request=codec.decode(message.getBody());
+            try(var loanScope=org.slf4j.MDC.putCloseable("loanId",request.event().loanId().toString());
+                var sagaScope=org.slf4j.MDC.putCloseable("sagaId",request.event().sagaId().toString());
+                var eventScope=org.slf4j.MDC.putCloseable("eventId",request.event().eventId().toString())) {
+                reservations.reserve(request);
+            }
         } catch (InvalidEvent failure) {
             log.warn("Evento rejeitado pelo catálogo: reason={}", failure.getMessage());
             channel.basicReject(tag, false);
