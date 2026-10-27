@@ -33,6 +33,7 @@ public class ReservationService {
     @Transactional
     public Outcome reserve(LoanRequestCodec.Request request) {
         var input = request.event();
+        jdbc.query("select pg_advisory_xact_lock(?)",rs -> {},input.loanId().getMostSignificantBits());
         var now = clock.instant();
         int inserted = jdbc.update("""
                 INSERT INTO inbox_events(consumer_name, event_id, fingerprint, processed_at) VALUES (?, ?, ?, ?)
@@ -45,6 +46,12 @@ public class ReservationService {
             return Outcome.DUPLICATE;
         }
 
+        var barriers=jdbc.query("select request_event_id from release_barriers where loan_id=?",
+                (rs,i)->rs.getObject(1,UUID.class),input.loanId());
+        if(!barriers.isEmpty()) {
+            if(!barriers.getFirst().equals(input.eventId())) throw new InvalidEvent("REQUEST_MISMATCH");
+            return Outcome.DUPLICATE;
+        }
         String placeholders = String.join(",", Collections.nCopies(request.books().size(), "?"));
         // All inventory locks follow PostgreSQL's UUID order, regardless of input ordering.
         var stock = jdbc.query("select id, available_copies from books where id in (" + placeholders

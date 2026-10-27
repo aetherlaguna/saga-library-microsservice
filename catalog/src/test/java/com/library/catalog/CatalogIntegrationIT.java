@@ -57,6 +57,7 @@ import com.library.catalog.reservation.ReservationService;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "library.outbox.enabled=false", "catalog.consumer.enabled=false", "catalog.consumer.retry-backoff-ms=2000",
         "spring.datasource.hikari.connection-timeout=1000"})
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class CatalogIntegrationIT {
     private static final String USER = "catalog_" + UUID.randomUUID();
@@ -80,6 +81,7 @@ class CatalogIntegrationIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired BookService books;
     @Autowired ReservationService reservations;
+    @Autowired com.library.catalog.reservation.ReleaseService releases;
     @Autowired LoanRequestCodec codec;
     @Autowired LoanRequestedListener listener;
     @Autowired OutboxDispatcher dispatcher;
@@ -415,4 +417,51 @@ class CatalogIntegrationIT {
         assertThat(dispatcher.publishNext()).isEqualTo(OutboxDispatcher.Result.SENT);
         assertThat(receive(MessagingTopology.LOAN_RESULTS).getMessageProperties().getMessageId()).isEqualTo(event.toString());
     }
+    private LibraryEvent<ReleaseCodec.Payload> releaseFor(LibraryEvent<LoanRequested> request) {
+        return new LibraryEvent<>(UUID.randomUUID(),"BooksReleaseRequested",1,Instant.now(),request.loanId(),
+                request.loanId(),request.loanId(),request.eventId(),new ReleaseCodec.Payload(request.eventId()));
+    }
+    @Test void releasesReservedStockOnceAndReplaysConfirmation() {
+        var book=books.create("Release test",1);
+        var input=request(List.of(book.id()));
+        reservations.reserve(codec.decode(mapper.writeValueAsBytes(input)));
+        var release=releaseFor(input);
+        releases.release(release); releases.release(release);
+        assertThat(books.find(book.id()).availableCopies()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select status from reservations where loan_id=?",String.class,input.loanId())).isEqualTo("RELEASED");
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where event_type='BooksReleased'",Long.class)).isEqualTo(1);
+    }
+    @Test void releaseBeforeRequestPreventsLateReservation() {
+        var book=books.create("Late test",1);
+        var input=request(List.of(book.id()));
+        releases.release(releaseFor(input));
+        assertThat(reservations.reserve(codec.decode(mapper.writeValueAsBytes(input)))).isEqualTo(ReservationService.Outcome.DUPLICATE);
+        assertThat(books.find(book.id()).availableCopies()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from reservations",Long.class)).isZero();
+    }
+    @Test void releaseOutboxFailureRollsBackStockAndBarrier() {
+        var book=books.create("Rollback release",1);
+        var input=request(List.of(book.id()));
+        reservations.reserve(codec.decode(mapper.writeValueAsBytes(input)));
+        var release=releaseFor(input);
+        jdbc.execute("alter table outbox_events add constraint test_no_release check(event_type<>'BooksReleased') not valid");
+        try {
+            assertThatThrownBy(() -> releases.release(release)).isInstanceOf(RuntimeException.class);
+            assertThat(books.find(book.id()).availableCopies()).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from release_barriers where loan_id=?",Long.class,input.loanId())).isZero();
+        } finally { jdbc.execute("alter table outbox_events drop constraint test_no_release"); }
+        releases.release(release);
+        assertThat(books.find(book.id()).availableCopies()).isEqualTo(1);
+    }
+    @Test void concurrentReleaseAndReservationNeverLeaveReservedStock() throws Exception {
+        var book=books.create("Race release",1); var input=request(List.of(book.id()));
+        var release=releaseFor(input);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var a=pool.submit(() -> reservations.reserve(codec.decode(mapper.writeValueAsBytes(input))));
+            var b=pool.submit(() -> { releases.release(release); return true; });
+            a.get(10,TimeUnit.SECONDS); b.get(10,TimeUnit.SECONDS);
+        }
+        assertThat(books.find(book.id()).availableCopies()).isEqualTo(1);
+    }
+
 }
