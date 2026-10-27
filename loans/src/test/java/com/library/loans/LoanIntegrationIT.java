@@ -190,6 +190,8 @@ class LoanIntegrationIT {
                 """, id, UUID.randomUUID(), UUID.randomUUID());
         jdbc.update("insert into upgrade_test.loan_books (loan_id, book_id) values (?, ?)", id, book);
         config.target("latest").load().migrate();
+        assertThat(jdbc.queryForObject("select state from upgrade_test.loan_sagas where loan_id=?",String.class,id))
+                .isEqualTo("MANUAL_REVIEW");
         assertThat(jdbc.queryForObject("select version from upgrade_test.loans where id = ?", Long.class, id))
                 .isZero();
         assertThat(jdbc.queryForObject("select book_id from upgrade_test.loan_books where loan_id = ?", UUID.class, id))
