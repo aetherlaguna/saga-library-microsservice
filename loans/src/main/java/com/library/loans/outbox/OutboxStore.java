@@ -27,13 +27,17 @@ public class OutboxStore {
     }
 
     public void append(LibraryEvent<LoanRequested> event) {
+        append(event, MessagingTopology.LOAN_REQUESTED);
+    }
+
+    public void append(LibraryEvent<?> event, String routingKey) {
         jdbc.update("""
                 INSERT INTO outbox_events
                 (event_id, loan_id, event_type, schema_version, exchange_name, routing_key,
                  body, created_at, next_attempt_at)
                 VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)
                 """, event.eventId(), event.loanId(), event.eventType(), event.schemaVersion(),
-                MessagingTopology.EVENTS, MessagingTopology.LOAN_REQUESTED,
+                MessagingTopology.EVENTS, routingKey,
                 mapper.writeValueAsString(event), Timestamp.from(event.occurredAt()),
                 Timestamp.from(event.occurredAt()));
     }

@@ -29,8 +29,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.library.loans.messaging.*;
 import com.library.loans.service.*;
 
-@SpringBootTest(properties = {"library.outbox.enabled=false", "loans.consumer.enabled=false",
+@SpringBootTest(properties = {"loans.saga.recovery-enabled=false", "library.outbox.enabled=false", "loans.consumer.enabled=false",
         "loans.consumer.retry-backoff-ms=100"})
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class CatalogResultIntegrationIT {
     @Container static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17");
@@ -50,6 +51,8 @@ class CatalogResultIntegrationIT {
     @Autowired LoanService loans;
     @Autowired CatalogResultService results;
     @Autowired CatalogResultCodec codec;
+    @Autowired SagaRecovery recovery;
+    @Autowired ReleaseResultService releaseResults;
     @Autowired CatalogResultListener resultListener;
     @Autowired RabbitTemplate rabbit;
     @Autowired RabbitAdmin admin;
@@ -180,6 +183,38 @@ class CatalogResultIntegrationIT {
             registry.getListenerContainer(CatalogResultListener.ID).stop();
             jdbc.execute("alter table loans drop constraint test_reject_active");
         }
+    }
+
+    @Test void timeoutWaitsForReleaseAndLateSuccessCannotActivateLoan() {
+        jdbc.update("update loan_sagas set deadline=? where loan_id=?",java.sql.Timestamp.from(Instant.now().minusSeconds(1)),loan);
+        assertThat(recovery.reconcile()).isEqualTo(1);
+        assertThat(status()).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("select state from loan_sagas where loan_id=?",String.class,loan)).isEqualTo("WAITING_RELEASE");
+        results.apply(decode(body(true,UUID.randomUUID())));
+        assertThat(status()).isEqualTo("PENDING");
+        UUID release=jdbc.queryForObject("select release_event_id from loan_sagas where loan_id=?",UUID.class,loan);
+        var confirm=new LibraryEvent<>(UUID.randomUUID(),"BooksReleased",1,Instant.now(),loan,loan,loan,release,new ReleaseCodec.Payload(request));
+        releaseResults.confirm(confirm); releaseResults.confirm(confirm);
+        assertThat(status()).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("select state from loan_sagas where loan_id=?",String.class,loan)).isEqualTo("COMPLETED");
+    }
+    @Test void lateResultAfterReleaseConfirmationKeepsCancelledState() {
+        jdbc.update("update loan_sagas set deadline=? where loan_id=?",java.sql.Timestamp.from(Instant.now().minusSeconds(1)),loan);
+        recovery.reconcile();
+        UUID release=jdbc.queryForObject("select release_event_id from loan_sagas where loan_id=?",UUID.class,loan);
+        releaseResults.confirm(new LibraryEvent<>(UUID.randomUUID(),"BooksReleased",1,Instant.now(),loan,loan,loan,release,new ReleaseCodec.Payload(request)));
+        results.apply(decode(body(true,UUID.randomUUID())));
+        assertThat(status()).isEqualTo("CANCELLED");
+    }
+    @Test void releaseReplayPreservesEventIdentityAndRecoveryIsRestartSafe() {
+        jdbc.update("update loan_sagas set deadline=? where loan_id=?",java.sql.Timestamp.from(Instant.now().minusSeconds(1)),loan);
+        recovery.reconcile(); recovery.reconcile();
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where event_type='BooksReleaseRequested'",Long.class)).isEqualTo(1);
+        UUID release=jdbc.queryForObject("select release_event_id from loan_sagas where loan_id=?",UUID.class,loan);
+        jdbc.update("update outbox_events set status='SENT',sent_at=?,next_attempt_at=? where event_id=?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(120)),java.sql.Timestamp.from(Instant.now()),release);
+        recovery.reconcile();
+        assertThat(jdbc.queryForObject("select status from outbox_events where event_id=?",String.class,release)).isEqualTo("PENDING");
     }
 
 }

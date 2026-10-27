@@ -24,11 +24,12 @@ public class CatalogResultService {
     private final JdbcTemplate jdbc;
     private final LoanRepository loans;
     private final Clock clock;
+    private final SagaRecovery recovery;
     private final TransactionTemplate transaction;
 
     public CatalogResultService(JdbcTemplate jdbc, LoanRepository loans, Clock clock,
-            PlatformTransactionManager manager) {
-        this.jdbc = jdbc; this.loans = loans; this.clock = clock;
+            PlatformTransactionManager manager, SagaRecovery recovery) {
+        this.jdbc = jdbc; this.loans = loans; this.clock = clock; this.recovery = recovery;
         transaction = new TransactionTemplate(manager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -49,6 +50,7 @@ public class CatalogResultService {
 
     private Outcome applyInTransaction(Result result) {
         var event = result.event();
+        jdbc.query("select id from loans where id=? for update", (rs,row)->rs.getObject(1), event.loanId());
         var now = Timestamp.from(clock.instant());
         int inserted = jdbc.update("""
                 INSERT INTO catalog_result_inbox(consumer_name,event_id,fingerprint,processed_at)
@@ -87,11 +89,13 @@ public class CatalogResultService {
                 || (!result.reserved() && !loan.getBookIds().containsAll(ids))) {
             throw new InvalidCatalogResult("BOOKS_MISMATCH");
         }
+        if (!"WAITING".equals(recovery.beforeResult(event.loanId()))) return Outcome.APPLIED;
         if (loan.getStatus() != LoanStatus.PENDING) {
             throw new InvalidCatalogResult("UNEXPECTED_LOAN_STATE");
         }
         if (result.reserved()) loan.activate(); else loan.cancel();
         loans.flush();
+        recovery.complete(event.loanId());
         return Outcome.APPLIED;
     }
 }

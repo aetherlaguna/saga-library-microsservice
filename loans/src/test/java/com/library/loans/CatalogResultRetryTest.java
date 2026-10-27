@@ -18,7 +18,7 @@ class CatalogResultRetryTest {
     @SuppressWarnings("unchecked")
     @Test void retriesOptimisticConflictsInNewTransactionsAndStopsAfterThreeAttempts() {
         var service=new CatalogResultService(mock(JdbcTemplate.class),mock(LoanRepository.class),
-                Clock.systemUTC(),mock(PlatformTransactionManager.class));
+                Clock.systemUTC(),mock(PlatformTransactionManager.class),mock(com.library.loans.service.SagaRecovery.class));
         var transaction=mock(TransactionTemplate.class);
         ReflectionTestUtils.setField(service,"transaction",transaction);
         var result=mock(CatalogResultCodec.Result.class);
